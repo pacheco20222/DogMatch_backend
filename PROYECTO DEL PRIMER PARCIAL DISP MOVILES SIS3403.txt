@@ -1,0 +1,26 @@
+PROYECTO DEL PRIMER PARCIAL
+Programación de dispositivos móviles SIS3403
+El proyecto consiste en que cada alumno debe hacer el backend del proyecto de la
+aplicación móvil de su preferencia (Python Flask o Java), y deberá cumplir con lo
+siguiente:
+1. Definición del objetivo: Define claramente el propósito de la aplicación móvil.
+¿Es para compartir material, para facilitar la comunicación entre las
+personas, para vender productos en línea, mostrar un catálogo de música
+películas, o para algo más?
+2. Identificación de los usuarios: Identifica quiénes serán los usuarios
+principales de la aplicación.
+3. Contenido: Decide qué tipo de contenido compartirás en la aplicación. Esto
+podría incluir lecturas, películas, música, vender productos o servicios, etc.
+4. Base de Datos: Decide que base de datos vas a usar y crea las colecciones y
+el CRUD para los documentos.
+5. Requerimientos: Para los requerimientos deberás hacer historias de usuario
+y ponerlas en el backlog y armar su tablero Kanban en Trello o software de
+su preferencia.
+6. Pruebas: Antes de lanzar el Backend, haz pruebas para asegurarte de que
+todo funciona correctamente. Puedes usar Insomnia o Postman.
+7. Deployment: Deberán hacer el Deployment de su Backend en Render.
+8. GITHUB: El Backend deberá un repo PUBLICO en GITHUB.
+9. ENTREGA: Deberán subir un video a YouTube de no más de 5 minutos donde
+expliquen su Backend, el código, y se vea en acción en Potsman, deberán
+entregar un PDF (con portada) donde expliquen los puntos del 1 al 4, se vea
+el link a su video, el link a Trello y el link a Github.
