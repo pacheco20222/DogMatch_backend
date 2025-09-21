@@ -1,3 +1,4 @@
+# # app/models/user.py
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
@@ -64,7 +65,9 @@ class User(db.Model):
     # Relationships (will be populated when we create other models)
     dogs = db.relationship('Dog', backref='owner', lazy=True, cascade='all, delete-orphan')
     organized_events = db.relationship('Event', backref='organizer', lazy=True, cascade='all, delete-orphan')
-    event_registrations = db.relationship('EventRegistration', backref='user', lazy=True, cascade='all, delete-orphan')
+    event_registrations = db.relationship('EventRegistration', 
+                                    foreign_keys='EventRegistration.user_id',
+                                    backref='user', lazy=True, cascade='all, delete-orphan')
     
     def __init__(self, email, password, username, user_type='owner', **kwargs):
         """
@@ -122,6 +125,8 @@ class User(db.Model):
         self.last_login = datetime.utcnow()
         self.reset_failed_login()
     
+    # ========== TWO-FACTOR AUTHENTICATION METHODS ==========
+    
     def generate_totp_secret(self):
         """Generate a new TOTP secret for 2FA setup"""
         self.totp_secret = pyotp.random_base32()
@@ -142,12 +147,15 @@ class User(db.Model):
         if not self.totp_secret:
             raise ValueError("TOTP secret not generated")
         
+        # Create QR code
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(self.get_totp_uri())
         qr.make(fit=True)
         
+        # Create QR code image
         img = qr.make_image(fill_color="black", back_color="white")
         
+        # Convert to base64 string
         img_buffer = io.BytesIO()
         img.save(img_buffer, format='PNG')
         img_str = base64.b64encode(img_buffer.getvalue()).decode()
@@ -164,12 +172,15 @@ class User(db.Model):
         
         totp = pyotp.TOTP(self.totp_secret)
         
+        # Get current time window
         current_time = datetime.utcnow()
         time_window = int(current_time.timestamp()) // 30
         
+        # Check if this time window was already used
         if self.last_totp_used and self.last_totp_used >= time_window:
             return False  # Prevent replay attacks
         
+        # Verify the token (allows for clock skew)
         if totp.verify(token, valid_window=1):
             self.last_totp_used = time_window
             db.session.commit()
@@ -185,9 +196,11 @@ class User(db.Model):
         if not self.totp_secret:
             raise ValueError("TOTP secret not generated")
         
+        # Verify the token first
         if not self.verify_totp(totp_token):
             return False
         
+        # Enable 2FA and generate backup codes
         self.is_2fa_enabled = True
         self.generate_backup_codes()
         db.session.commit()
@@ -207,6 +220,7 @@ class User(db.Model):
         
         codes = []
         for _ in range(10):
+            # Generate 8-character alphanumeric codes
             code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
             codes.append({
                 'code': code,
@@ -252,7 +266,7 @@ class User(db.Model):
         Verify 2FA using either TOTP token or backup code
         """
         if not self.is_2fa_enabled:
-            return True  
+            return True  # 2FA not enabled, so it's valid
         
         if token:
             return self.verify_totp(token)
@@ -261,6 +275,7 @@ class User(db.Model):
         
         return False
     
+    # ========== OTHER USER METHODS ==========
     
     def get_full_name(self):
         """Return full name or username if names not provided"""
@@ -289,6 +304,14 @@ class User(db.Model):
         include_sensitive: Whether to include email and phone (admin only)
         include_2fa_status: Whether to include 2FA status information
         """
+        def safe_isoformat(dt_obj):
+            """Safely convert datetime to isoformat string"""
+            if dt_obj is None:
+                return None
+            if hasattr(dt_obj, 'isoformat'):
+                return dt_obj.isoformat()
+            return str(dt_obj)
+        
         data = {
             'id': self.id,
             'username': self.username,
@@ -301,8 +324,8 @@ class User(db.Model):
             'country': self.country,
             'is_active': self.is_active,
             'is_verified': self.is_verified,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'created_at': safe_isoformat(self.created_at),
+            'last_login': safe_isoformat(self.last_login)
         }
         
         if include_sensitive:

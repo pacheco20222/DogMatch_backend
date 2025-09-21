@@ -1,8 +1,8 @@
 """Initial models: User, Dog, Match, Message, Event, EventRegistration
 
-Revision ID: 4ee5a7fdf72f
+Revision ID: 75b0da93df76
 Revises: 
-Create Date: 2025-09-20 05:09:29.510215
+Create Date: 2025-09-20 15:33:03.171181
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '4ee5a7fdf72f'
+revision = '75b0da93df76'
 down_revision = None
 branch_labels = None
 depends_on = None

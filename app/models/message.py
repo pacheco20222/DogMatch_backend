@@ -1,3 +1,4 @@
+# app/models/message.py
 from datetime import datetime
 from app import db, ma
 from marshmallow import fields, validate, validates, ValidationError

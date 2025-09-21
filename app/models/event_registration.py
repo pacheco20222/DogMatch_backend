@@ -1,3 +1,4 @@
+# app/models/event_registration.py
 from datetime import datetime, timedelta
 from app import db, ma
 from marshmallow import fields, validate, validates, ValidationError

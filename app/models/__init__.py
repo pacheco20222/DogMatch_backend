@@ -1,4 +1,5 @@
-﻿"""
+﻿# app/models/__init__.py
+"""
 Models package initialization
 Centralizes all model imports for clean importing throughout the application
 """

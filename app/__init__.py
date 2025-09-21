@@ -63,20 +63,20 @@ def register_blueprints(app):
     # For now, comment out to test models first
     
     # Import blueprints
-    # from app.routes.auth import auth_bp
-    # from app.routes.users import users_bp  
-    # from app.routes.dogs import dogs_bp
-    # from app.routes.matches import matches_bp
-    # from app.routes.messages import messages_bp
-    # from app.routes.events import events_bp
+    from app.routes.auth import auth_bp
+    from app.routes.users import users_bp  
+    from app.routes.dogs import dogs_bp
+    from app.routes.matches import matches_bp
+    from app.routes.messages import messages_bp
+    from app.routes.events import events_bp
     
     # Register with URL prefixes
-    # app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    # app.register_blueprint(users_bp, url_prefix='/api/users')
-    # app.register_blueprint(dogs_bp, url_prefix='/api/dogs')
-    # app.register_blueprint(matches_bp, url_prefix='/api/matches')
-    # app.register_blueprint(messages_bp, url_prefix='/api/messages')
-    # app.register_blueprint(events_bp, url_prefix='/api/events')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(users_bp, url_prefix='/api/users')
+    app.register_blueprint(dogs_bp, url_prefix='/api/dogs')
+    app.register_blueprint(matches_bp, url_prefix='/api/matches')
+    app.register_blueprint(messages_bp, url_prefix='/api/messages')
+    app.register_blueprint(events_bp, url_prefix='/api/events')
     
     pass  # No routes for now
 
@@ -124,12 +124,12 @@ def register_jwt_handlers(app):
     # Import here to avoid circular imports
     from app.models.user import BlacklistedToken
     
-    @jwt.token_in_blocklist_loader
-    def check_if_token_revoked(jwt_header, jwt_payload):
-        """Check if JWT token is blacklisted (revoked)"""
-        jti = jwt_payload['jti']  # JWT ID - unique identifier for each token
-        blacklisted_token = BlacklistedToken.query.filter_by(jti=jti).first()
-        return blacklisted_token is not None
+    #@jwt.token_in_blocklist_loader
+    #def check_if_token_revoked(jwt_header, jwt_payload):
+    #    """Check if JWT token is blacklisted (revoked)"""
+    #    jti = jwt_payload['jti']  # JWT ID - unique identifier for each token
+    #    blacklisted_token = BlacklistedToken.query.filter_by(jti=jti).first()
+    #    return blacklisted_token is not None
     
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
