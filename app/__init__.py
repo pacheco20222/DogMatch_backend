@@ -4,6 +4,8 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
+from app.models.user import User
+from datetime import datetime
 import os
 
 # Initialize extensions (but don't bind to app yet)
@@ -162,3 +164,53 @@ def register_jwt_handlers(app):
             'error': 'Revoked Token',
             'message': 'The JWT token has been revoked'
         }), 401
+
+def register_health_routes(app):
+    """Register health check routes"""
+    
+    @app.route('/', methods=['GET', 'HEAD'])
+    def root():
+        """Root endpoint for health checks"""
+        return jsonify({
+            'message': 'DogMatch API is running successfully',
+            'status': 'healthy',
+            'version': '1.0.0',
+            'service': 'DogMatch Backend',
+            'endpoints': {
+                'auth': '/api/auth',
+                'users': '/api/users', 
+                'dogs': '/api/dogs',
+                'matches': '/api/matches',
+                'messages': '/api/messages',
+                'events': '/api/events'
+            },
+            'documentation': {
+                'health': '/',
+                'user_registration': '/api/auth/register',
+                'user_login': '/api/auth/login'
+            }
+        }), 200
+    
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        """Detailed health check endpoint"""
+        # Test database connection
+        db_status = 'connected'
+        try:
+            User.query.first()  
+        except Exception as e:
+            db_status = f'error: {str(e)}'
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'service': 'DogMatch Backend API',
+            'version': '1.0.0',
+            'database': db_status,
+            'environment': app.config.get('FLASK_ENV', 'unknown'),
+            'features': {
+                'authentication': 'JWT + 2FA',
+                'database': 'MySQL',
+                'features': ['user_management', 'dog_profiles', 'matching', 'messaging', 'events']
+            }
+        }), 200
