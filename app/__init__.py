@@ -1,10 +1,9 @@
-﻿from flask import Flask, jsonify
+from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
-from app.models.user import User
 from datetime import datetime
 import os
 
@@ -46,7 +45,10 @@ def create_app(config_name=None):
     
     # Register JWT handlers
     register_jwt_handlers(app)
-    
+
+    # Register health checks
+    register_health_routes(app)
+
     # Create upload folder if it doesn't exist
     upload_folder = app.config['UPLOAD_FOLDER']
     if not os.path.exists(upload_folder):
@@ -163,7 +165,9 @@ def register_jwt_handlers(app):
 
 def register_health_routes(app):
     """Register health check routes"""
-    
+
+    from app.models.user import User
+
     @app.route('/', methods=['GET', 'HEAD'])
     def root():
         """Root endpoint for health checks"""
@@ -186,7 +190,7 @@ def register_health_routes(app):
                 'user_login': '/api/auth/login'
             }
         }), 200
-    
+
     @app.route('/health', methods=['GET'])
     def health_check():
         """Detailed health check endpoint"""
@@ -196,7 +200,7 @@ def register_health_routes(app):
             User.query.first()  
         except Exception as e:
             db_status = f'error: {str(e)}'
-        
+
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
