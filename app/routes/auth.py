@@ -16,6 +16,22 @@ from app.models import (
 
 auth_bp = Blueprint("auth", __name__)
 
+@auth_bp.route('/', methods=['GET'])
+def root():
+    return jsonify({
+        'message': 'DogMatch API is running',
+        'version': '1.0.0',
+        'status': 'healthy',
+        'endpoints': {
+            'auth': '/api/auth',
+            'users': '/api/users',
+            'dogs': '/api/dogs',
+            'matches': '/api/matches',
+            'messages': '/api/messages',
+            'events': '/api/events'
+        }
+    }), 200
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """
