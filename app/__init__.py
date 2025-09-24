@@ -38,10 +38,6 @@ def create_app(config_name=None):
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
     ma.init_app(app)
     
-    # Import models (needed for migrations) - import after app context is created
-    with app.app_context():
-        from app.models import user, dog, match, message, event, event_registration
-    
     # Register blueprints (route modules)
     register_blueprints(app)
     
