@@ -213,27 +213,32 @@ class Event(db.Model):
     
     def update_participant_count(self):
         """Update current participant count based on confirmed registrations"""
+        # Import here to avoid circular imports
+        from app.models.event_registration import EventRegistration
         confirmed_count = self.registrations.filter(
             EventRegistration.status == 'confirmed'
         ).count()
-        
+    
         self.current_participants = confirmed_count
         db.session.commit()
     
     def get_confirmed_registrations(self):
         """Get all confirmed registrations for this event"""
+        from app.models.event_registration import EventRegistration
         return self.registrations.filter(
             EventRegistration.status == 'confirmed'
         ).all()
     
     def get_pending_registrations(self):
         """Get all pending registrations (if approval required)"""
+        from app.models.event_registration import EventRegistration
         return self.registrations.filter(
             EventRegistration.status == 'pending'
         ).all()
     
     def is_user_registered(self, user_id):
         """Check if user is registered for this event"""
+        from app.models.event_registration import EventRegistration
         registration = self.registrations.filter(
             EventRegistration.user_id == user_id
         ).first()
@@ -241,6 +246,7 @@ class Event(db.Model):
     
     def get_user_registration(self, user_id):
         """Get user's registration for this event"""
+        from app.models.event_registration import EventRegistration
         return self.registrations.filter(
             EventRegistration.user_id == user_id
         ).first()
