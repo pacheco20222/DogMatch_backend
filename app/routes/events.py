@@ -61,7 +61,7 @@ def create_event():
         
         return jsonify({
             'message': 'Event created successfully',
-            'event': event.to_dict(include_organizer=True, include_stats=True)
+            'event': event.to_dict(include_organizer=True)
         }), 201
         
     except ValidationError as e:
@@ -142,7 +142,7 @@ def get_events():
         events = query.limit(limit).offset(offset).all()
         
         # Convert to dict
-        events_data = [event.to_dict(include_organizer=True, include_stats=True) for event in events]
+        events_data = [event.to_dict(include_organizer=True) for event in events]
         
         return jsonify({
             'events': events_data,
@@ -239,7 +239,7 @@ def update_event(event_id):
         
         return jsonify({
             'message': 'Event updated successfully',
-            'event': event.to_dict(include_organizer=True, include_stats=True)
+            'event': event.to_dict(include_organizer=True)
         }), 200
         
     except ValidationError as e:
@@ -526,7 +526,7 @@ def get_my_events():
                            .order_by(Event.event_date.desc()).all()
         
         # Convert to dict
-        events_data = [event.to_dict(include_organizer=False, include_stats=True) for event in events]
+        events_data = [event.to_dict(include_organizer=False) for event in events]
         
         return jsonify({
             'events': events_data,
