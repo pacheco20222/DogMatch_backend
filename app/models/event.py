@@ -428,7 +428,13 @@ class EventCreateSchema(ma.Schema):
     @validates('event_date')
     def validate_event_date(self, value):
         """Validate that event date is in the future"""
-        if value <= datetime.utcnow():
+        # Convert to timezone-naive datetime for comparison
+        if hasattr(value, 'replace'):
+            compare_value = value.replace(tzinfo=None)
+        else:
+            compare_value = value
+        
+        if compare_value <= datetime.utcnow():
             raise ValidationError('Event date must be in the future.')
     
     @validates('registration_deadline')

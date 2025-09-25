@@ -190,7 +190,6 @@ def get_event(event_id):
         
         event_data = event.to_dict(
             include_organizer=True, 
-            include_stats=True,
             current_user_id=current_user_id
         )
         

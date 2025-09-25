@@ -166,6 +166,7 @@ class Match(db.Model):
     
     def update_message_stats(self):
         """Update message count and last message timestamp"""
+        from app.models.message import Message  # Avoid circular import
         message_count = self.messages.count()
         last_message = self.messages.order_by(Message.sent_at.desc()).first()
         
@@ -235,6 +236,7 @@ class Match(db.Model):
         
         if include_messages and self.can_send_messages():
             # Include last few messages
+            from app.models.message import Message  # Avoid circular import
             recent_messages = self.messages.order_by(Message.sent_at.desc()).limit(5).all()
             data['recent_messages'] = [msg.to_dict() for msg in reversed(recent_messages)]
         
