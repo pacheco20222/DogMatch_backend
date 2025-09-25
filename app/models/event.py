@@ -424,6 +424,7 @@ class EventCreateSchema(ma.Schema):
     contact_phone = fields.Str(validate=validate.Length(max=20))
     additional_info = fields.Str()
     rules_and_guidelines = fields.Str()
+    image_url = fields.Str()
     
     @validates('event_date')
     def validate_event_date(self, value):
@@ -480,6 +481,7 @@ class EventUpdateSchema(ma.Schema):
     contact_phone = fields.Str(validate=validate.Length(max=20))
     additional_info = fields.Str()
     rules_and_guidelines = fields.Str()
+    image_url = fields.Str()
 
 
 class EventResponseSchema(ma.Schema):
@@ -557,6 +559,10 @@ class EventListSchema(ma.Schema):
     user_latitude = fields.Float(validate=validate.Range(min=-90, max=90))
     user_longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     price_max = fields.Float(validate=validate.Range(min=0))
+    free_only = fields.Bool(missing=False)
+    organizer_type = fields.Str(validate=validate.OneOf(['shelter', 'admin']))
+    start_date = fields.DateTime()
+    end_date = fields.DateTime()
     registration_open_only = fields.Bool(missing=False)
     limit = fields.Int(validate=validate.Range(min=1, max=100), missing=20)
     offset = fields.Int(validate=validate.Range(min=0), missing=0)

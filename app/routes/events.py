@@ -24,46 +24,74 @@ def create_event():
     try:
         current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
-        
+
         if not user:
             return jsonify({'error': 'User not found'}), 404
-        
-        # Check if user can create events (shelters and admins)
+
         if not (user.is_shelter() or user.is_admin()):
             return jsonify({'error': 'Only shelters and admins can create events'}), 403
-        
-        # Validate input data
+
         schema = EventCreateSchema()
         data = schema.load(request.json)
-        
-        # Create new event
+
+        event_date = data['event_date']
+        registration_deadline = data.get('registration_deadline')
+        if registration_deadline and registration_deadline >= event_date:
+            return jsonify({
+                'error': 'Validation failed',
+                'messages': {
+                    'registration_deadline': ['Registration deadline must be before the event date.']
+                }
+            }), 400
+
+        event_kwargs = {
+            'description': data.get('description'),
+            'category': data.get('category'),
+            'duration_hours': data.get('duration_hours'),
+            'registration_deadline': registration_deadline,
+            'city': data.get('city'),
+            'state': data.get('state'),
+            'country': data.get('country'),
+            'latitude': data.get('latitude'),
+            'longitude': data.get('longitude'),
+            'venue_details': data.get('venue_details'),
+            'max_participants': data.get('max_participants'),
+            'price': data.get('price'),
+            'currency': data.get('currency'),
+            'min_age_requirement': data.get('min_age_requirement'),
+            'max_age_requirement': data.get('max_age_requirement'),
+            'vaccination_required': data.get('vaccination_required'),
+            'special_requirements': data.get('special_requirements'),
+            'requires_approval': data.get('requires_approval'),
+            'contact_email': data.get('contact_email'),
+            'contact_phone': data.get('contact_phone'),
+            'additional_info': data.get('additional_info'),
+            'rules_and_guidelines': data.get('rules_and_guidelines'),
+            'image_url': data.get('image_url')
+        }
+
         event = Event(
             organizer_id=current_user_id,
             title=data['title'],
-            description=data['description'],
-            event_date=data['event_date'],
+            event_date=event_date,
             location=data['location'],
-            event_type=data.get('event_type', 'meetup'),
-            price=data.get('price', 0.0),
-            max_participants=data.get('max_participants'),
-            requires_approval=data.get('requires_approval', False),
-            allows_dogs=data.get('allows_dogs', True),
-            latitude=data.get('latitude'),
-            longitude=data.get('longitude'),
-            image_url=data.get('image_url'),
-            requirements=data.get('requirements'),
-            contact_info=data.get('contact_info')
+            **{k: v for k, v in event_kwargs.items() if v is not None}
         )
-        
-        # Save to database
+
+        if data.get('size_requirements') is not None:
+            event.set_size_requirements_list(data['size_requirements'])
+
+        if data.get('breed_restrictions') is not None:
+            event.set_breed_restrictions_list(data['breed_restrictions'])
+
         db.session.add(event)
         db.session.commit()
-        
+
         return jsonify({
             'message': 'Event created successfully',
             'event': event.to_dict(include_organizer=True)
         }), 201
-        
+
     except ValidationError as e:
         return jsonify({
             'error': 'Validation failed',
@@ -81,77 +109,109 @@ def create_event():
 def get_events():
     """
     Get events with optional filters
-    GET /api/events?event_type=adoption&city=Mérida&upcoming=true
+    GET /api/events?category=adoption&city=Merida&upcoming_only=true
     """
     try:
-        # Validate query parameters
         schema = EventListSchema()
         filters = schema.load(request.args)
-        
-        # Build base query
-        query = Event.query.filter(Event.is_active == True)
-        
-        # Apply filters
-        if filters.get('event_type'):
-            query = query.filter(Event.event_type == filters['event_type'])
-        
-        if filters.get('city'):
-            query = query.filter(Event.location.ilike(f"%{filters['city']}%"))
-        
-        if filters.get('upcoming', True):
+
+        query = Event.query
+
+        status = filters.get('status')
+        if status:
+            query = query.filter(Event.status == status)
+        else:
+            query = query.filter(Event.status == 'published')
+
+        category = filters.get('category')
+        if category:
+            query = query.filter(Event.category == category)
+
+        city = filters.get('city')
+        if city:
+            like_pattern = f"%{city}%"
+            query = query.filter(
+                db.or_(
+                    Event.city.ilike(like_pattern),
+                    Event.location.ilike(like_pattern)
+                )
+            )
+
+        state = filters.get('state')
+        if state:
+            query = query.filter(Event.state.ilike(f"%{state}%"))
+
+        country = filters.get('country')
+        if country:
+            query = query.filter(Event.country.ilike(f"%{country}%"))
+
+        if filters.get('upcoming_only', True):
             query = query.filter(Event.event_date >= datetime.utcnow())
-        
-        if filters.get('free_only', False):
+
+        if filters.get('registration_open_only'):
+            now = datetime.utcnow()
+            query = query.filter(
+                db.or_(
+                    Event.registration_deadline.is_(None),
+                    Event.registration_deadline >= now
+                )
+            )
+
+        if filters.get('price_max') is not None:
+            query = query.filter(Event.price <= filters['price_max'])
+
+        if filters.get('free_only'):
             query = query.filter(Event.price == 0)
-        
-        if filters.get('organizer_type'):
-            if filters['organizer_type'] == 'shelter':
-                query = query.join(User).filter(User.user_type == 'shelter')
-            elif filters['organizer_type'] == 'admin':
-                query = query.join(User).filter(User.user_type == 'admin')
-        
-        # Date range filtering
-        if filters.get('start_date'):
-            query = query.filter(Event.event_date >= filters['start_date'])
-        
-        if filters.get('end_date'):
-            query = query.filter(Event.event_date <= filters['end_date'])
-        
-        # Distance filtering (if coordinates provided)
+
+        organizer_type = filters.get('organizer_type')
+        if organizer_type:
+            query = query.join(User)
+            if organizer_type == 'shelter':
+                query = query.filter(User.user_type == 'shelter')
+            elif organizer_type == 'admin':
+                query = query.filter(User.user_type == 'admin')
+
+        start_date = filters.get('start_date')
+        if start_date:
+            query = query.filter(Event.event_date >= start_date)
+
+        end_date = filters.get('end_date')
+        if end_date:
+            query = query.filter(Event.event_date <= end_date)
+
         user_lat = filters.get('user_latitude')
         user_lng = filters.get('user_longitude')
-        max_distance = filters.get('max_distance_km')
-        
+        max_distance = filters.get('max_distance')
         if user_lat and user_lng and max_distance:
-            # Note: This is a simplified distance calculation
-            # In production, you'd want to use a proper spatial database function
-            pass  # TODO: Implement proper geospatial filtering
-        
-        # Apply sorting
-        sort_by = filters.get('sort_by', 'date')
+            pass  # TODO: Implement geospatial filtering when needed
+
+        sort_by = request.args.get('sort_by', 'date')
         if sort_by == 'date':
             query = query.order_by(Event.event_date.asc())
         elif sort_by == 'created':
             query = query.order_by(Event.created_at.desc())
         elif sort_by == 'popularity':
-            query = query.order_by(Event.registered_count.desc())
-        
-        # Apply pagination
+            query = query.order_by(Event.current_participants.desc())
+
         limit = filters.get('limit', 20)
         offset = filters.get('offset', 0)
         events = query.limit(limit).offset(offset).all()
-        
-        # Convert to dict
+
         events_data = [event.to_dict(include_organizer=True) for event in events]
-        
+
+        filters_response = dict(filters)
+        if not status:
+            filters_response['status'] = 'published'
+        filters_response['sort_by'] = sort_by
+
         return jsonify({
             'events': events_data,
             'count': len(events_data),
             'limit': limit,
             'offset': offset,
-            'filters_applied': filters
+            'filters_applied': filters_response
         }), 200
-        
+
     except ValidationError as e:
         return jsonify({
             'error': 'Validation failed',
@@ -214,34 +274,45 @@ def update_event(event_id):
     try:
         current_user_id = int(get_jwt_identity())
         event = Event.query.get(event_id)
-        
+
         if not event:
             return jsonify({'error': 'Event not found'}), 404
-        
-        # Check if user can edit this event
+
         if not event.can_be_edited_by(current_user_id):
             return jsonify({'error': 'You can only edit your own events'}), 403
-        
-        # Validate input data
+
         schema = EventUpdateSchema()
         data = schema.load(request.json)
-        
-        # Update fields
+
+        proposed_event_date = data.get('event_date') or event.event_date
+        proposed_deadline = data.get('registration_deadline') or event.registration_deadline
+        if proposed_deadline and proposed_event_date and proposed_deadline >= proposed_event_date:
+            return jsonify({
+                'error': 'Validation failed',
+                'messages': {
+                    'registration_deadline': ['Registration deadline must be before the event date.']
+                }
+            }), 400
+
         for field, value in data.items():
+            if field == 'size_requirements':
+                event.set_size_requirements_list(value)
+                continue
+            if field == 'breed_restrictions':
+                event.set_breed_restrictions_list(value)
+                continue
             if hasattr(event, field):
                 setattr(event, field, value)
-        
-        # Update timestamp
+
         event.updated_at = datetime.utcnow()
-        
-        # Save changes
+
         db.session.commit()
-        
+
         return jsonify({
             'message': 'Event updated successfully',
             'event': event.to_dict(include_organizer=True)
         }), 200
-        
+
     except ValidationError as e:
         return jsonify({
             'error': 'Validation failed',
@@ -276,7 +347,6 @@ def delete_event(event_id):
         
         # Soft delete - mark as cancelled instead of hard delete
         event.status = 'cancelled'
-        event.is_active = False
         event.updated_at = datetime.utcnow()
         
         # Notify all registered participants
@@ -344,8 +414,9 @@ def register_for_event(event_id):
             if not dog:
                 return jsonify({'error': 'Dog not found or not owned by you'}), 404
             
-            if not event.allows_dogs:
-                return jsonify({'error': 'This event does not allow dogs'}), 400
+            can_participate, requirement_message = event.can_dog_participate(dog)
+            if not can_participate:
+                return jsonify({'error': requirement_message}), 400
         
         # Create registration
         registration = EventRegistration(
@@ -375,7 +446,7 @@ def register_for_event(event_id):
         db.session.add(registration)
         
         # Update event stats
-        event.update_registration_stats()
+        event.update_participant_count()
         
         db.session.commit()
         
@@ -440,7 +511,7 @@ def unregister_from_event(event_id):
         
         # Update event stats
         if event:
-            event.update_registration_stats()
+            event.update_participant_count()
         
         db.session.commit()
         
@@ -714,44 +785,40 @@ def get_event_stats():
     try:
         current_user_id = int(get_jwt_identity())
         user = User.query.get(current_user_id)
-        
+
         if not user or not user.is_admin():
             return jsonify({'error': 'Admin privileges required'}), 403
-        
-        # Calculate event statistics
+
         total_events = Event.query.count()
-        active_events = Event.query.filter(Event.is_active == True).count()
+        active_events = Event.query.filter(Event.status == 'published').count()
         upcoming_events = Event.query.filter(
             Event.event_date >= datetime.utcnow(),
-            Event.is_active == True
+            Event.status == 'published'
         ).count()
-        
-        # Registration statistics
+
         total_registrations = EventRegistration.query.count()
         confirmed_registrations = EventRegistration.query.filter(
             EventRegistration.status == 'confirmed'
         ).count()
-        
-        # Event type breakdown
-        event_types_stats = db.session.query(
-            Event.event_type,
+
+        categories_stats = db.session.query(
+            Event.category,
             db.func.count(Event.id).label('count')
-        ).group_by(Event.event_type).all()
-        
-        # Recent activity (last 30 days)
+        ).group_by(Event.category).all()
+
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         new_events_30d = Event.query.filter(Event.created_at >= thirty_days_ago).count()
         new_registrations_30d = EventRegistration.query.filter(
             EventRegistration.created_at >= thirty_days_ago
         ).count()
-        
+
         stats = {
             'events': {
                 'total': total_events,
                 'active': active_events,
                 'upcoming': upcoming_events,
                 'new_last_30_days': new_events_30d,
-                'by_type': [{'type': et[0], 'count': et[1]} for et in event_types_stats]
+                'by_type': [{'type': cat[0], 'count': cat[1]} for cat in categories_stats]
             },
             'registrations': {
                 'total': total_registrations,
@@ -760,14 +827,16 @@ def get_event_stats():
                 'new_last_30_days': new_registrations_30d
             }
         }
-        
+
         return jsonify({
             'stats': stats,
             'generated_at': datetime.utcnow().isoformat()
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             'error': 'Failed to get event stats',
             'message': str(e)
         }), 500
+
+
