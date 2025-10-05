@@ -31,7 +31,18 @@ def save_uploaded_file(file, dog_id):
         # Save file
         upload_folder = current_app.config['UPLOAD_FOLDER']
         file_path = os.path.join(upload_folder, unique_filename)
+        
+        # Ensure directory exists
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Save file
         file.save(file_path)
+        
+        # Verify file was saved
+        if os.path.exists(file_path):
+            print(f"✅ File saved successfully: {file_path}")
+        else:
+            print(f"❌ File save failed: {file_path}")
         
         # Return relative URL for database storage
         relative_url = f"/static/dog_photos/{unique_filename}"

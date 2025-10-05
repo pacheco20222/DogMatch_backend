@@ -227,9 +227,22 @@ def register_static_routes(app):
     """Register static file serving routes"""
     
     from flask import send_from_directory
+    import os
     
     @app.route('/static/dog_photos/<filename>')
     def uploaded_file(filename):
         """Serve uploaded dog photos"""
-        upload_folder = app.config['UPLOAD_FOLDER']
+        # Get absolute path to upload folder
+        upload_folder = os.path.abspath(app.config['UPLOAD_FOLDER'])
+        file_path = os.path.join(upload_folder, filename)
+        
+        print(f"🔍 Static file request: {filename}")
+        print(f"📁 Upload folder: {upload_folder}")
+        print(f"📄 File path: {file_path}")
+        print(f"✅ File exists: {os.path.exists(file_path)}")
+        
+        if not os.path.exists(file_path):
+            print(f"❌ File not found: {file_path}")
+            return "File not found", 404
+            
         return send_from_directory(upload_folder, filename)
