@@ -39,7 +39,7 @@ def save_uploaded_file(file, dog_id):
     
     return None, None
 
-@dogs_bp.route("/", methods=["POST"])
+@dogs_bp.route("/", methods=["POST"], strict_slashes=False)
 @jwt_required()
 def create_dog():
     try:
@@ -102,7 +102,7 @@ def create_dog():
             'message': str(e)
         }), 500
         
-@dogs_bp.route('/', methods=['GET'])
+@dogs_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_dogs():
     """
     Get dogs with optional filters
@@ -319,7 +319,7 @@ def discover_dogs():
         }), 500
 
 
-@dogs_bp.route('/my-dogs', methods=['GET'])
+@dogs_bp.route('/my-dogs', methods=['GET'], strict_slashes=False)
 @jwt_required()
 def get_my_dogs():
     """
