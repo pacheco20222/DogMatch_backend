@@ -1,8 +1,11 @@
 # /app/routes/dogs.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from datetime import datetime
+import os
+import uuid
+from werkzeug.utils import secure_filename
 from app import db
 
 from app.models import(
@@ -11,6 +14,30 @@ from app.models import(
 )
 
 dogs_bp = Blueprint("dogs", __name__)
+
+def allowed_file(filename):
+    """Check if file extension is allowed"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
+
+def save_uploaded_file(file, dog_id):
+    """Save uploaded file and return the filename and URL"""
+    if file and allowed_file(file.filename):
+        # Generate unique filename
+        filename = secure_filename(file.filename)
+        file_extension = filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"{dog_id}_{uuid.uuid4().hex}.{file_extension}"
+        
+        # Save file
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        file_path = os.path.join(upload_folder, unique_filename)
+        file.save(file_path)
+        
+        # Return relative URL for database storage
+        relative_url = f"/static/dog_photos/{unique_filename}"
+        return unique_filename, relative_url
+    
+    return None, None
 
 @dogs_bp.route("/", methods=["POST"])
 @jwt_required()
@@ -327,6 +354,7 @@ def add_dog_photo(dog_id):
     """
     Add photo to dog profile
     POST /api/dogs/123/photos
+    Accepts both file uploads and JSON with URL
     """
     try:
         current_user_id = int(get_jwt_identity())
@@ -339,14 +367,32 @@ def add_dog_photo(dog_id):
         if dog.owner_id != current_user_id:
             return jsonify({'error': 'You can only add photos to your own dogs'}), 403
         
-        # Get photo data from request
-        data = request.json
-        photo_url = data.get('url')
-        filename = data.get('filename')
-        is_primary = data.get('is_primary', False)
+        # Handle file upload
+        if 'photo' in request.files:
+            file = request.files['photo']
+            is_primary = request.form.get('is_primary', 'false').lower() == 'true'
+            
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            
+            # Save uploaded file
+            filename, photo_url = save_uploaded_file(file, dog_id)
+            
+            if not photo_url:
+                return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif'}), 400
         
-        if not photo_url:
-            return jsonify({'error': 'Photo URL is required'}), 400
+        # Handle JSON with URL (for external URLs or testing)
+        elif request.is_json:
+            data = request.json
+            photo_url = data.get('url')
+            filename = data.get('filename')
+            is_primary = data.get('is_primary', False)
+            
+            if not photo_url:
+                return jsonify({'error': 'Photo URL is required'}), 400
+        
+        else:
+            return jsonify({'error': 'No photo provided. Send file as "photo" or JSON with "url"'}), 400
         
         # Create photo record
         photo = Photo(
@@ -399,7 +445,16 @@ def delete_dog_photo(dog_id, photo_id):
         if not photo:
             return jsonify({'error': 'Photo not found'}), 404
         
-        # Delete photo
+        # Delete file from filesystem if it's a local file
+        if photo.url.startswith('/static/dog_photos/'):
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], photo.filename)
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass  # File might already be deleted, continue
+        
+        # Delete photo record
         db.session.delete(photo)
         db.session.commit()
         

@@ -48,11 +48,19 @@ def create_app(config_name=None):
 
     # Register health checks
     register_health_routes(app)
+    
+    # Register static file serving
+    register_static_routes(app)
 
-    # Create upload folder if it doesn't exist
+    # Create upload folders if they don't exist
     upload_folder = app.config['UPLOAD_FOLDER']
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder, exist_ok=True)
+    
+    # Also create static folder structure
+    static_folder = os.path.join('app', 'static')
+    if not os.path.exists(static_folder):
+        os.makedirs(static_folder, exist_ok=True)
     
     return app
 
@@ -214,3 +222,14 @@ def register_health_routes(app):
                 'features': ['user_management', 'dog_profiles', 'matching', 'messaging', 'events']
             }
         }), 200
+
+def register_static_routes(app):
+    """Register static file serving routes"""
+    
+    from flask import send_from_directory
+    
+    @app.route('/static/dog_photos/<filename>')
+    def uploaded_file(filename):
+        """Serve uploaded dog photos"""
+        upload_folder = app.config['UPLOAD_FOLDER']
+        return send_from_directory(upload_folder, filename)

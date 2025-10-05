@@ -32,22 +32,16 @@ def create_seed_data():
     
     # Create data in proper order (respecting foreign key dependencies)
     users = create_users()
-    dogs = create_dogs(users)
-    photos = create_photos(dogs)
-    matches = create_matches(dogs)
-    messages = create_messages(matches, users)
-    events = create_events(users)
-    event_registrations = create_event_registrations(events, users, dogs)
     
     print("✅ Database seeding completed successfully!")
     print(f"📊 Created:")
     print(f"   👥 {len(users)} users")
-    print(f"   🐕 {len(dogs)} dogs")
-    print(f"   📸 {len(photos)} photos")
-    print(f"   💕 {len(matches)} matches")
-    print(f"   💬 {len(messages)} messages")
-    print(f"   🎉 {len(events)} events")
-    print(f"   🎟️  {len(event_registrations)} event registrations")
+    print(f"   🐕 0 dogs (empty tables ready for app development)")
+    print(f"   📸 0 photos")
+    print(f"   💕 0 matches")
+    print(f"   💬 0 messages")
+    print(f"   🎉 0 events")
+    print(f"   🎟️  0 event registrations")
 
 def clear_existing_data():
     """Clear existing data from all tables (use with caution!)"""
@@ -72,106 +66,18 @@ def create_users():
     print("👥 Creating users...")
     
     users_data = [
-        # Regular dog owners
+        # Single test user for development
         {
-            'email': 'carlos.martinez@email.com',
-            'username': 'carlos_mx',
+            'email': 'test@dogmatch.com',
+            'username': 'testuser',
             'password': 'SecurePass123!',
-            'first_name': 'Carlos',
-            'last_name': 'Martínez',
+            'first_name': 'Test',
+            'last_name': 'User',
             'user_type': 'owner',
             'city': 'Mérida',
             'state': 'Yucatán',
             'country': 'México',
             'phone': '+52 999 123 4567'
-        },
-        {
-            'email': 'ana.lopez@email.com',
-            'username': 'ana_dogs',
-            'password': 'SecurePass123!',
-            'first_name': 'Ana',
-            'last_name': 'López',
-            'user_type': 'owner',
-            'city': 'Cancún',
-            'state': 'Quintana Roo',
-            'country': 'México',
-            'phone': '+52 998 234 5678'
-        },
-        {
-            'email': 'miguel.rodriguez@email.com',
-            'username': 'miguel_pets',
-            'password': 'SecurePass123!',
-            'first_name': 'Miguel',
-            'last_name': 'Rodríguez',
-            'user_type': 'owner',
-            'city': 'Guadalajara',
-            'state': 'Jalisco',
-            'country': 'México',
-            'phone': '+52 33 345 6789'
-        },
-        {
-            'email': 'lucia.hernandez@email.com',
-            'username': 'lucia_love_dogs',
-            'password': 'SecurePass123!',
-            'first_name': 'Lucía',
-            'last_name': 'Hernández',
-            'user_type': 'owner',
-            'city': 'México',
-            'state': 'Ciudad de México',
-            'country': 'México',
-            'phone': '+52 55 456 7890'
-        },
-        {
-            'email': 'fernando.garcia@email.com',
-            'username': 'fernando_k9',
-            'password': 'SecurePass123!',
-            'first_name': 'Fernando',
-            'last_name': 'García',
-            'user_type': 'owner',
-            'city': 'Monterrey',
-            'state': 'Nuevo León',
-            'country': 'México',
-            'phone': '+52 81 567 8901'
-        },
-        
-        # Shelter users
-        {
-            'email': 'refugio.esperanza@shelter.org',
-            'username': 'refugio_esperanza',
-            'password': 'ShelterPass123!',
-            'first_name': 'Refugio',
-            'last_name': 'Esperanza',
-            'user_type': 'shelter',
-            'city': 'Mérida',
-            'state': 'Yucatán',
-            'country': 'México',
-            'phone': '+52 999 111 2222'
-        },
-        {
-            'email': 'patitas.felices@shelter.org',
-            'username': 'patitas_felices',
-            'password': 'ShelterPass123!',
-            'first_name': 'Asociación',
-            'last_name': 'Patitas Felices',
-            'user_type': 'shelter',
-            'city': 'Cancún',
-            'state': 'Quintana Roo',
-            'country': 'México',
-            'phone': '+52 998 222 3333'
-        },
-        
-        # Admin user
-        {
-            'email': 'admin@dogmatch.com',
-            'username': 'admin_dogmatch',
-            'password': 'AdminPass123!',
-            'first_name': 'Admin',
-            'last_name': 'DogMatch',
-            'user_type': 'admin',
-            'city': 'México',
-            'state': 'Ciudad de México',
-            'country': 'México',
-            'phone': '+52 55 000 0000'
         }
     ]
     
@@ -871,14 +777,11 @@ if __name__ == '__main__':
     
     with app.app_context():
         try:
+            db.create_all()
             create_seed_data()
             
             # Update statistics after all data is created
             print("📊 Updating statistics...")
-            
-            # Update message counts for matches
-            matches = Match.query.all()
-            update_match_message_stats(matches)
             
             print("\n🎉 Database seeding completed successfully!")
             print("\n📈 Final Statistics:")
@@ -891,17 +794,8 @@ if __name__ == '__main__':
             print(f"   🎟️  Event Registrations: {EventRegistration.query.count()}")
             
             print("\n🔐 Test User Credentials:")
-            print("   Regular Users (password: SecurePass123!):")
-            print("   - carlos.martinez@email.com (carlos_mx)")
-            print("   - ana.lopez@email.com (ana_dogs)")
-            print("   - miguel.rodriguez@email.com (miguel_pets)")
-            print("   - lucia.hernandez@email.com (lucia_love_dogs)")
-            print("   - fernando.garcia@email.com (fernando_k9)")
-            print("\n   Shelter Users (password: ShelterPass123!):")
-            print("   - refugio.esperanza@shelter.org (refugio_esperanza)")
-            print("   - patitas.felices@shelter.org (patitas_felices)")
-            print("\n   Admin User (password: AdminPass123!):")
-            print("   - admin@dogmatch.com (admin_dogmatch)")
+            print("   Test User (password: SecurePass123!):")
+            print("   - test@dogmatch.com (testuser)")
             
             print("\n🚀 Ready for API testing!")
             

@@ -24,7 +24,7 @@ class Config:
     
     # File Upload Settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
-    UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads')
+    UPLOAD_FOLDER = os.path.join('app', 'static', 'dog_photos')
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     
     CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(',')
