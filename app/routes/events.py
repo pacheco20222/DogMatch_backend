@@ -401,14 +401,22 @@ def register_for_event(event_id):
         if not event.is_registration_open():
             return jsonify({'error': 'Registration is not open for this event'}), 400
         
-        # Check if user is already registered
+        # Check if user is already registered (only active registrations)
         existing_registration = EventRegistration.query.filter(
             EventRegistration.event_id == event_id,
-            EventRegistration.user_id == current_user_id
+            EventRegistration.user_id == current_user_id,
+            EventRegistration.status.in_(['confirmed', 'pending'])
         ).first()
         
         if existing_registration:
             return jsonify({'error': 'You are already registered for this event'}), 400
+        
+        # Check if user has a cancelled registration that we can reactivate
+        cancelled_registration = EventRegistration.query.filter(
+            EventRegistration.event_id == event_id,
+            EventRegistration.user_id == current_user_id,
+            EventRegistration.status == 'cancelled'
+        ).first()
         
         # Validate input data
         schema = EventRegistrationCreateSchema()
@@ -430,16 +438,27 @@ def register_for_event(event_id):
             if not can_participate:
                 return jsonify({'error': requirement_message}), 400
         
-        # Create registration
-        registration = EventRegistration(
-            event_id=event_id,
-            user_id=current_user_id,
-            dog_id=dog_id,
-            notes=data.get('notes'),
-            special_requests=data.get('special_requests'),
-            emergency_contact_name=data.get('emergency_contact_name'),
-            emergency_contact_phone=data.get('emergency_contact_phone')
-        )
+        # Either reactivate cancelled registration or create new one
+        if cancelled_registration:
+            # Reactivate cancelled registration
+            registration = cancelled_registration
+            registration.notes = data.get('notes', '')
+            registration.special_requests = data.get('special_requests', '')
+            registration.emergency_contact_name = data.get('emergency_contact_name', '')
+            registration.emergency_contact_phone = data.get('emergency_contact_phone', '')
+            registration.cancelled_at = None
+        else:
+            # Create new registration
+            registration = EventRegistration(
+                event_id=event_id,
+                user_id=current_user_id,
+                dog_id=dog_id,
+                notes=data.get('notes'),
+                special_requests=data.get('special_requests'),
+                emergency_contact_name=data.get('emergency_contact_name'),
+                emergency_contact_phone=data.get('emergency_contact_phone')
+            )
+            db.session.add(registration)
         
         # Set status based on event requirements
         if event.requires_approval:
@@ -453,9 +472,6 @@ def register_for_event(event_id):
             # TODO: Integrate with payment processor
         else:
             registration.payment_status = 'completed'
-        
-        # Save registration
-        db.session.add(registration)
         
         # Update event stats
         event.update_participant_count()
@@ -496,7 +512,8 @@ def unregister_from_event(event_id):
         
         registration = EventRegistration.query.filter(
             EventRegistration.event_id == event_id,
-            EventRegistration.user_id == current_user_id
+            EventRegistration.user_id == current_user_id,
+            EventRegistration.status.in_(['confirmed', 'pending'])
         ).first()
         
         if not registration:
