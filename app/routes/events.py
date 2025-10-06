@@ -75,6 +75,7 @@ def create_event():
             title=data['title'],
             event_date=event_date,
             location=data['location'],
+            status='published',  # Auto-publish events for now
             **{k: v for k, v in event_kwargs.items() if v is not None}
         )
 
