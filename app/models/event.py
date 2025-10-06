@@ -240,7 +240,8 @@ class Event(db.Model):
         """Check if user is registered for this event"""
         from app.models.event_registration import EventRegistration
         registration = self.registrations.filter(
-            EventRegistration.user_id == user_id
+            EventRegistration.user_id == user_id,
+            EventRegistration.status.in_(['confirmed', 'pending'])
         ).first()
         return registration is not None
     
@@ -248,7 +249,8 @@ class Event(db.Model):
         """Get user's registration for this event"""
         from app.models.event_registration import EventRegistration
         return self.registrations.filter(
-            EventRegistration.user_id == user_id
+            EventRegistration.user_id == user_id,
+            EventRegistration.status.in_(['confirmed', 'pending'])
         ).first()
     
     def can_dog_participate(self, dog):
