@@ -66,7 +66,7 @@ def create_users():
     print("👥 Creating users...")
     
     users_data = [
-        # Single test user for development
+        # Test user for development
         {
             'email': 'test@dogmatch.com',
             'username': 'testuser',
@@ -78,6 +78,19 @@ def create_users():
             'state': 'Yucatán',
             'country': 'México',
             'phone': '+52 999 123 4567'
+        },
+        # Admin user for testing events functionality
+        {
+            'email': 'admin@dogmatch.com',
+            'username': 'admin',
+            'password': 'AdminPass123!',
+            'first_name': 'Admin',
+            'last_name': 'User',
+            'user_type': 'admin',
+            'city': 'Mérida',
+            'state': 'Yucatán',
+            'country': 'México',
+            'phone': '+52 999 000 0000'
         }
     ]
     
@@ -795,7 +808,9 @@ if __name__ == '__main__':
             
             print("\n🔐 Test User Credentials:")
             print("   Test User (password: SecurePass123!):")
-            print("   - test@dogmatch.com (testuser)")
+            print("   - test@dogmatch.com (testuser) - Owner")
+            print("   Admin User (password: AdminPass123!):")
+            print("   - admin@dogmatch.com (admin) - Admin")
             
             print("\n🚀 Ready for API testing!")
             

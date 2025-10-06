@@ -14,7 +14,7 @@ from app.models import (
 # Create Blueprint
 events_bp = Blueprint('events', __name__)
 
-@events_bp.route('/', methods=['POST'])
+@events_bp.route('/', methods=['POST'], strict_slashes=False)
 @jwt_required()
 def create_event():
     """
@@ -105,7 +105,7 @@ def create_event():
         }), 500
 
 
-@events_bp.route('/', methods=['GET'])
+@events_bp.route('/', methods=['GET'], strict_slashes=False)
 def get_events():
     """
     Get events with optional filters
@@ -582,7 +582,7 @@ def get_event_registrations(event_id):
         }), 500
 
 
-@events_bp.route('/my-events', methods=['GET'])
+@events_bp.route('/my-events', methods=['GET'], strict_slashes=False)
 @jwt_required()
 def get_my_events():
     """
@@ -611,7 +611,7 @@ def get_my_events():
         }), 500
 
 
-@events_bp.route('/my-registrations', methods=['GET'])
+@events_bp.route('/my-registrations', methods=['GET'], strict_slashes=False)
 @jwt_required()
 def get_my_registrations():
     """
@@ -733,7 +733,7 @@ def reject_registration(event_id, registration_id):
         }), 500
 
 
-@events_bp.route('/categories', methods=['GET'])
+@events_bp.route('/categories', methods=['GET'], strict_slashes=False)
 def get_event_categories():
     """
     Get available event types and categories
