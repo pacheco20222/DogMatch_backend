@@ -198,7 +198,18 @@ def get_events():
         offset = filters.get('offset', 0)
         events = query.limit(limit).offset(offset).all()
 
-        events_data = [event.to_dict(include_organizer=True) for event in events]
+        # Get current user ID if authenticated
+        current_user_id = None
+        try:
+            from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+            verify_jwt_in_request(optional=True)
+            current_user_id = get_jwt_identity()
+            if current_user_id:
+                current_user_id = int(current_user_id)
+        except:
+            pass  # User not authenticated
+        
+        events_data = [event.to_dict(include_organizer=True, current_user_id=current_user_id) for event in events]
 
         filters_response = dict(filters)
         if not status:
