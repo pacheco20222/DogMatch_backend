@@ -424,9 +424,10 @@ def register_for_event(event_id):
             event_id=event_id,
             user_id=current_user_id,
             dog_id=dog_id,
-            registration_notes=data.get('registration_notes'),
-            emergency_contact=data.get('emergency_contact'),
-            dietary_restrictions=data.get('dietary_restrictions')
+            notes=data.get('notes'),
+            special_requests=data.get('special_requests'),
+            emergency_contact_name=data.get('emergency_contact_name'),
+            emergency_contact_phone=data.get('emergency_contact_phone')
         )
         
         # Set status based on event requirements
@@ -434,7 +435,6 @@ def register_for_event(event_id):
             registration.status = 'pending'
         else:
             registration.status = 'confirmed'
-            registration.confirmed_at = datetime.utcnow()
         
         # Handle payment if event has a price
         if event.price > 0:

@@ -20,7 +20,7 @@ class EventRegistration(db.Model):
     # Foreign keys
     event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    dog_id = db.Column(db.Integer, db.ForeignKey('dogs.id'), nullable=False)
+    dog_id = db.Column(db.Integer, db.ForeignKey('dogs.id'), nullable=True)
     
     # Registration status
     status = db.Column(db.Enum('pending', 'confirmed', 'rejected', 'cancelled', 'waitlisted', name='registration_status_enum'), 
@@ -75,10 +75,11 @@ class EventRegistration(db.Model):
         db.UniqueConstraint('event_id', 'user_id', name='unique_user_event_registration'),
     )
     
-    def __init__(self, event_id, user_id, dog_id, **kwargs):
+    def __init__(self, event_id, user_id, dog_id=None, **kwargs):
         """
         Initialize EventRegistration instance
-        Required fields: event_id, user_id, dog_id
+        Required fields: event_id, user_id
+        Optional fields: dog_id
         """
         self.event_id = event_id
         self.user_id = user_id
@@ -389,7 +390,7 @@ class EventRegistration(db.Model):
 class EventRegistrationCreateSchema(ma.Schema):
     """Schema for creating new event registrations"""
     
-    dog_id = fields.Int(required=True)
+    dog_id = fields.Int(required=False)
     notes = fields.Str(validate=validate.Length(max=500))
     special_requests = fields.Str(validate=validate.Length(max=500))
     emergency_contact_name = fields.Str(validate=validate.Length(max=100))
