@@ -10,7 +10,7 @@ class Config:
     
     # Database Configuration, to connect to the database
     SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or \
-        f"mysql+pymysql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT', '3306')}/{os.environ.get('DB_NAME')}"
+        f"mysql+pymysql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT', '3306')}/{os.environ.get('DB_NAME')}?ssl_disabled=false&ssl_verify_cert=true&ssl_verify_identity=true"
         
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_RECORD_QUERIES = True

@@ -77,6 +77,7 @@ def register_blueprints(app):
     from app.routes.matches import matches_bp
     from app.routes.messages import messages_bp
     from app.routes.events import events_bp
+    from app.routes.migrate import migrate_bp
     
     # Register with URL prefixes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -85,6 +86,7 @@ def register_blueprints(app):
     app.register_blueprint(matches_bp, url_prefix='/api/matches')
     app.register_blueprint(messages_bp, url_prefix='/api/messages')
     app.register_blueprint(events_bp, url_prefix='/api/events')
+    app.register_blueprint(migrate_bp, url_prefix='/api/migrate')
     
     pass  # No routes for now
 

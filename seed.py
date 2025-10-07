@@ -32,16 +32,25 @@ def create_seed_data():
     
     # Create data in proper order (respecting foreign key dependencies)
     users = create_users()
+    dogs = create_dogs(users)
+    photos = create_photos(dogs)
+    matches = create_matches(dogs)
+    messages = create_messages(matches, users)
+    events = create_events(users)
+    registrations = create_event_registrations(events, users, dogs)
+    
+    # Update statistics
+    update_match_message_stats(matches)
     
     print("✅ Database seeding completed successfully!")
     print(f"📊 Created:")
     print(f"   👥 {len(users)} users")
-    print(f"   🐕 0 dogs (empty tables ready for app development)")
-    print(f"   📸 0 photos")
-    print(f"   💕 0 matches")
-    print(f"   💬 0 messages")
-    print(f"   🎉 0 events")
-    print(f"   🎟️  0 event registrations")
+    print(f"   🐕 {len(dogs)} dogs")
+    print(f"   📸 {len(photos)} photos")
+    print(f"   💕 {len(matches)} matches")
+    print(f"   💬 {len(messages)} messages")
+    print(f"   🎉 {len(events)} events")
+    print(f"   🎟️  {len(registrations)} event registrations")
 
 def clear_existing_data():
     """Clear existing data from all tables (use with caution!)"""
@@ -91,6 +100,92 @@ def create_users():
             'state': 'Yucatán',
             'country': 'México',
             'phone': '+52 999 000 0000'
+        },
+        # Additional users for testing swipe functionality
+        {
+            'email': 'carlos@dogmatch.com',
+            'username': 'carlos_owner',
+            'password': 'SecurePass123!',
+            'first_name': 'Carlos',
+            'last_name': 'Martínez',
+            'user_type': 'owner',
+            'city': 'Mérida',
+            'state': 'Yucatán',
+            'country': 'México',
+            'phone': '+52 999 111 2222'
+        },
+        {
+            'email': 'ana@dogmatch.com',
+            'username': 'ana_owner',
+            'password': 'SecurePass123!',
+            'first_name': 'Ana',
+            'last_name': 'López',
+            'user_type': 'owner',
+            'city': 'Cancún',
+            'state': 'Quintana Roo',
+            'country': 'México',
+            'phone': '+52 998 222 3333'
+        },
+        {
+            'email': 'miguel@dogmatch.com',
+            'username': 'miguel_owner',
+            'password': 'SecurePass123!',
+            'first_name': 'Miguel',
+            'last_name': 'García',
+            'user_type': 'owner',
+            'city': 'Guadalajara',
+            'state': 'Jalisco',
+            'country': 'México',
+            'phone': '+52 33 333 4444'
+        },
+        {
+            'email': 'lucia@dogmatch.com',
+            'username': 'lucia_owner',
+            'password': 'SecurePass123!',
+            'first_name': 'Lucía',
+            'last_name': 'Hernández',
+            'user_type': 'owner',
+            'city': 'México',
+            'state': 'Ciudad de México',
+            'country': 'México',
+            'phone': '+52 55 444 5555'
+        },
+        {
+            'email': 'fernando@dogmatch.com',
+            'username': 'fernando_owner',
+            'password': 'SecurePass123!',
+            'first_name': 'Fernando',
+            'last_name': 'Rodríguez',
+            'user_type': 'owner',
+            'city': 'Monterrey',
+            'state': 'Nuevo León',
+            'country': 'México',
+            'phone': '+52 81 555 6666'
+        },
+        # Shelter users
+        {
+            'email': 'refugio@dogmatch.com',
+            'username': 'refugio_esperanza',
+            'password': 'SecurePass123!',
+            'first_name': 'Refugio',
+            'last_name': 'Esperanza',
+            'user_type': 'shelter',
+            'city': 'Mérida',
+            'state': 'Yucatán',
+            'country': 'México',
+            'phone': '+52 999 666 7777'
+        },
+        {
+            'email': 'patitas@dogmatch.com',
+            'username': 'patitas_felices',
+            'password': 'SecurePass123!',
+            'first_name': 'Patitas',
+            'last_name': 'Felices',
+            'user_type': 'shelter',
+            'city': 'Cancún',
+            'state': 'Quintana Roo',
+            'country': 'México',
+            'phone': '+52 998 777 8888'
         }
     ]
     
@@ -351,19 +446,12 @@ def create_photos(dogs):
     """Create sample photos for dogs"""
     print("📸 Creating photos...")
     
-    # Sample photo URLs (using placeholder images)
-    photo_urls = [
-        'https://images.unsplash.com/photo-1552053831-71594a27632d?w=500',  # Golden retriever
-        'https://images.unsplash.com/photo-1551717743-49959800b1f6?w=500',  # Border collie
-        'https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?w=500',  # German shepherd
-        'https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=500',  # French bulldog
-        'https://images.unsplash.com/photo-1605568427561-40dd23c2acea?w=500',  # Rottweiler
-        'https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=500',  # Mixed breed
-        'https://images.unsplash.com/photo-1601758228041-f3b2795255f1?w=500',  # Chihuahua
-        'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=500',  # Pitbull
-        'https://images.unsplash.com/photo-1546975490-e8b92a360b24?w=500',  # Generic dog 1
-        'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=500',   # Generic dog 2
-    ]
+    # Use the paw.png icon from the backend static folder
+    paw_icon_url = '/static/dog_photos/paw.png'
+    
+    # For now, we'll use the paw icon for all dogs
+    # In a real app, you'd upload actual dog photos
+    photo_urls = [paw_icon_url] * 10
     
     photos = []
     for i, dog in enumerate(dogs):
