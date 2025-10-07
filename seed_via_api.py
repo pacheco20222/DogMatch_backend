@@ -322,14 +322,14 @@ def seed_database():
     
     # Step 0: Clear and recreate database tables
     print("\n🔄 Step 0: Clearing and recreating database tables...")
-    init_response = make_request('POST', '/migrate/init')
-    if init_response and init_response.status_code == 200:
+    reset_response = make_request('POST', '/migrate/reset')
+    if reset_response and reset_response.status_code == 200:
         print("   ✅ Database tables cleared and recreated successfully")
     else:
         print("   ❌ Failed to clear/recreate database tables. Aborting seeding.")
-        if init_response:
-            print(f"   Status Code: {init_response.status_code}")
-            print(f"   Error: {init_response.text}")
+        if reset_response:
+            print(f"   Status Code: {reset_response.status_code}")
+            print(f"   Error: {reset_response.text}")
         return
     
     # Step 1: Register all users

@@ -27,6 +27,31 @@ def init_database():
             'message': str(e)
         }), 500
 
+@migrate_bp.route('/reset', methods=['POST'])
+def reset_database():
+    """
+    Clear all data and recreate tables
+    POST /api/migrate/reset
+    """
+    try:
+        # Drop all tables
+        db.drop_all()
+        
+        # Create all tables
+        db.create_all()
+        
+        return jsonify({
+            'message': 'Database reset successfully - all data cleared and tables recreated',
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Database reset failed: {e}")
+        return jsonify({
+            'error': 'Database reset failed',
+            'message': str(e)
+        }), 500
+
 @migrate_bp.route('/status', methods=['GET'])
 def migration_status():
     """
