@@ -7,6 +7,7 @@ This script populates the database with sample data using the deployed backend A
 import requests
 import json
 import random
+import time
 from datetime import datetime, timedelta
 
 # Configuration
