@@ -215,10 +215,26 @@ def upload_dog_photo(token, dog_id, photo_data):
     
     headers = {'Authorization': f'Bearer {token}'}
     
-    # For now, we'll skip photo upload since we don't have actual image files
-    # In a real scenario, you'd upload the paw.png image
-    print(f"   ⏭️  Skipping photo upload (would upload paw.png)")
-    return True
+    # Create a photo record using the static paw.png
+    photo_data = {
+        'url': f'{BASE_URL}/static/dog_photos/paw.png',
+        'filename': f'dog_{dog_id}_photo.jpg',
+        'is_primary': True,
+        'file_size': 50000,
+        'width': 500,
+        'height': 500
+    }
+    
+    response = make_request('POST', f'/dogs/{dog_id}/photos', photo_data, headers)
+    
+    if response and response.status_code == 201:
+        print(f"   ✅ Photo uploaded for dog {dog_id}")
+        return True
+    else:
+        print(f"   ⚠️  Photo upload failed for dog {dog_id}, but continuing...")
+        if response:
+            print(f"   Error: {response.text}")
+        return False
 
 def create_event(token, event_data):
     """Create a new event"""
@@ -304,6 +320,18 @@ def seed_database():
         print("❌ Cannot proceed - backend is not accessible")
         return
     
+    # Step 0: Clear and recreate database tables
+    print("\n🔄 Step 0: Clearing and recreating database tables...")
+    init_response = make_request('POST', '/migrate/init')
+    if init_response and init_response.status_code == 200:
+        print("   ✅ Database tables cleared and recreated successfully")
+    else:
+        print("   ❌ Failed to clear/recreate database tables. Aborting seeding.")
+        if init_response:
+            print(f"   Status Code: {init_response.status_code}")
+            print(f"   Error: {init_response.text}")
+        return
+    
     # Step 1: Register all users
     print("\n📝 Step 1: Registering users...")
     registered_users = []
@@ -346,13 +374,14 @@ def seed_database():
                     
                     result = create_dog(token, dog_data)
                     if result:
+                        dog_id = result.get('dog', {}).get('id')
                         all_dogs.append({
-                            'dog_id': result.get('dog', {}).get('id'),
+                            'dog_id': dog_id,
                             'owner_email': user_data['email']
                         })
                         
-                        # Upload photo (skip for now)
-                        upload_dog_photo(token, result.get('dog', {}).get('id'), {})
+                        # Upload photo using static paw.png
+                        upload_dog_photo(token, dog_id, {})
     
     print(f"✅ Created {len(all_dogs)} dogs")
     
