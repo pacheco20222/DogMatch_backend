@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 BASE_URL = "https://dogmatch-backend.onrender.com"  # Your deployed backend URL
 API_BASE = f"{BASE_URL}/api"
 
+# Generate unique timestamp for this seeding session
+TIMESTAMP = int(time.time())
+
 # Sample data
 USERS_DATA = [
     {
