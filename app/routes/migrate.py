@@ -84,18 +84,22 @@ def add_s3_photo_fields():
     """
     try:
         # Add profile photo fields to users table
-        db.engine.execute("""
-            ALTER TABLE users 
-            ADD COLUMN profile_photo_url VARCHAR(500) NULL,
-            ADD COLUMN profile_photo_filename VARCHAR(255) NULL
-        """)
+        with db.engine.connect() as connection:
+            connection.execute(db.text("""
+                ALTER TABLE users 
+                ADD COLUMN profile_photo_url VARCHAR(500) NULL,
+                ADD COLUMN profile_photo_filename VARCHAR(255) NULL
+            """))
+            connection.commit()
         
         # Add S3 fields to photos table
-        db.engine.execute("""
-            ALTER TABLE photos 
-            ADD COLUMN s3_key VARCHAR(500) NULL,
-            ADD COLUMN content_type VARCHAR(100) NULL
-        """)
+        with db.engine.connect() as connection:
+            connection.execute(db.text("""
+                ALTER TABLE photos 
+                ADD COLUMN s3_key VARCHAR(500) NULL,
+                ADD COLUMN content_type VARCHAR(100) NULL
+            """))
+            connection.commit()
         
         return jsonify({
             'message': 'S3 photo fields added successfully',
