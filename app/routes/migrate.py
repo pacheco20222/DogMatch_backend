@@ -75,3 +75,36 @@ def migration_status():
             'status': 'error',
             'error': str(e)
         }), 200
+
+@migrate_bp.route('/add-s3-fields', methods=['POST'])
+def add_s3_photo_fields():
+    """
+    Add S3 photo fields to existing tables
+    POST /api/migrate/add-s3-fields
+    """
+    try:
+        # Add profile photo fields to users table
+        db.engine.execute("""
+            ALTER TABLE users 
+            ADD COLUMN profile_photo_url VARCHAR(500) NULL,
+            ADD COLUMN profile_photo_filename VARCHAR(255) NULL
+        """)
+        
+        # Add S3 fields to photos table
+        db.engine.execute("""
+            ALTER TABLE photos 
+            ADD COLUMN s3_key VARCHAR(500) NULL,
+            ADD COLUMN content_type VARCHAR(100) NULL
+        """)
+        
+        return jsonify({
+            'message': 'S3 photo fields added successfully',
+            'status': 'success'
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to add S3 fields: {e}")
+        return jsonify({
+            'error': 'Failed to add S3 fields',
+            'message': str(e)
+        }), 500

@@ -49,6 +49,10 @@ class User(db.Model):
     state = db.Column(db.String(100), nullable=True)
     country = db.Column(db.String(100), nullable=True, default='Mexico')
     
+    # Profile photo fields (for S3 integration)
+    profile_photo_url = db.Column(db.String(500), nullable=True)  # S3 URL for profile photo
+    profile_photo_filename = db.Column(db.String(255), nullable=True)  # Original filename
+    
     # Account status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_verified = db.Column(db.Boolean, default=False, nullable=False)
@@ -286,6 +290,10 @@ class User(db.Model):
         else:
             return self.username
     
+    def get_profile_photo_url(self):
+        """Get profile photo URL or default placeholder"""
+        return self.profile_photo_url or '/static/images/default-user.jpg'
+    
     def is_admin(self):
         """Check if user has admin privileges"""
         return self.user_type == 'admin'
@@ -322,6 +330,7 @@ class User(db.Model):
             'city': self.city,
             'state': self.state,
             'country': self.country,
+            'profile_photo_url': self.get_profile_photo_url(),
             'is_active': self.is_active,
             'is_verified': self.is_verified,
             'created_at': safe_isoformat(self.created_at),
@@ -451,6 +460,8 @@ class UserUpdateSchema(ma.Schema):
     city = fields.Str(validate=validate.Length(max=100), allow_none=True)
     state = fields.Str(validate=validate.Length(max=100), allow_none=True)
     country = fields.Str(validate=validate.Length(max=100), allow_none=True)
+    profile_photo_url = fields.Str(validate=validate.Length(max=500), allow_none=True)
+    profile_photo_filename = fields.Str(validate=validate.Length(max=255), allow_none=True)
     
     @validates('phone')
     def validate_phone(self, value):
@@ -473,6 +484,7 @@ class UserResponseSchema(ma.Schema):
     city = fields.Str()
     state = fields.Str()
     country = fields.Str()
+    profile_photo_url = fields.Str()
     is_active = fields.Bool()
     is_verified = fields.Bool()
     is_2fa_enabled = fields.Bool()

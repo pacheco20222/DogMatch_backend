@@ -274,14 +274,16 @@ class Photo(db.Model):
     dog_id = db.Column(db.Integer, db.ForeignKey('dogs.id'), nullable=False)
     
     # Photo information
-    url = db.Column(db.String(500), nullable=False)  # URL or file path
+    url = db.Column(db.String(500), nullable=False)  # S3 URL or file path
     filename = db.Column(db.String(255), nullable=True)  # Original filename
+    s3_key = db.Column(db.String(500), nullable=True)  # S3 object key for easy deletion
     is_primary = db.Column(db.Boolean, default=False, nullable=False)
     
     # Metadata
     file_size = db.Column(db.Integer, nullable=True)  # Size in bytes
     width = db.Column(db.Integer, nullable=True)
     height = db.Column(db.Integer, nullable=True)
+    content_type = db.Column(db.String(100), nullable=True)  # MIME type (image/jpeg, image/png, etc.)
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -303,16 +305,27 @@ class Photo(db.Model):
         self.is_primary = True
         db.session.commit()
     
+    def is_s3_photo(self):
+        """Check if this photo is stored in S3"""
+        return self.url.startswith('https://') and 's3' in self.url
+    
+    def get_s3_key(self):
+        """Get S3 key for this photo (if stored in S3)"""
+        return self.s3_key
+    
     def to_dict(self):
         return {
             'id': self.id,
             'dog_id': self.dog_id,
             'url': self.url,
             'filename': self.filename,
+            's3_key': self.s3_key,
             'is_primary': self.is_primary,
             'file_size': self.file_size,
             'width': self.width,
             'height': self.height,
+            'content_type': self.content_type,
+            'is_s3_photo': self.is_s3_photo(),
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
     
@@ -428,8 +441,11 @@ class PhotoSchema(ma.Schema):
     dog_id = fields.Int()
     url = fields.Str()
     filename = fields.Str()
+    s3_key = fields.Str()
     is_primary = fields.Bool()
     file_size = fields.Int()
     width = fields.Int()
     height = fields.Int()
+    content_type = fields.Str()
+    is_s3_photo = fields.Bool()
     created_at = fields.DateTime()

@@ -303,6 +303,10 @@ class Event(db.Model):
         
         return r * c
     
+    def get_event_image_url(self):
+        """Get event image URL or default placeholder"""
+        return self.image_url or '/static/images/default-event.jpg'
+    
     def to_dict(self, include_organizer=True, include_registrations=False, current_user_id=None):
         """
         Convert event to dictionary for JSON responses
@@ -337,7 +341,7 @@ class Event(db.Model):
             'is_recurring': self.is_recurring,
             'recurrence_pattern': self.recurrence_pattern,
             'requires_approval': self.requires_approval,
-            'image_url': self.image_url,
+            'image_url': self.get_event_image_url(),
             'contact_email': self.contact_email,
             'contact_phone': self.contact_phone,
             'additional_info': self.additional_info,
