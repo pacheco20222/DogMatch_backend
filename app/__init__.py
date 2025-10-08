@@ -78,6 +78,7 @@ def register_blueprints(app):
     from app.routes.messages import messages_bp
     from app.routes.events import events_bp
     from app.routes.migrate import migrate_bp
+    from app.routes.s3 import s3_bp
     
     # Register with URL prefixes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -87,6 +88,7 @@ def register_blueprints(app):
     app.register_blueprint(messages_bp, url_prefix='/api/messages')
     app.register_blueprint(events_bp, url_prefix='/api/events')
     app.register_blueprint(migrate_bp, url_prefix='/api/migrate')
+    app.register_blueprint(s3_bp, url_prefix='/api/s3')
     
     pass  # No routes for now
 
@@ -192,7 +194,8 @@ def register_health_routes(app):
                 'dogs': '/api/dogs',
                 'matches': '/api/matches',
                 'messages': '/api/messages',
-                'events': '/api/events'
+                'events': '/api/events',
+                's3': '/api/s3'
             },
             'documentation': {
                 'health': '/',

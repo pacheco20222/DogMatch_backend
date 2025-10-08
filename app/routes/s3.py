@@ -1,0 +1,197 @@
+# app/routes/s3.py
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.services.s3_service import s3_service
+from app import db
+from app.models import User, Dog, Photo, Event
+
+s3_bp = Blueprint("s3", __name__)
+
+@s3_bp.route('/test-connection', methods=['GET'])
+@jwt_required()
+def test_s3_connection():
+    """
+    Test S3 connection and bucket access
+    GET /api/s3/test-connection
+    """
+    try:
+        result = s3_service.test_connection()
+        
+        if result['success']:
+            return jsonify({
+                'message': 'S3 connection successful',
+                'bucket': 'dogmatch-bucket',
+                'status': 'success'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'S3 connection failed',
+                'message': result['error']
+            }), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"S3 test connection error: {e}")
+        return jsonify({
+            'error': 'S3 test failed',
+            'message': str(e)
+        }), 500
+
+@s3_bp.route('/upload/user-profile', methods=['POST'])
+@jwt_required()
+def upload_user_profile_photo():
+    """
+    Upload user profile photo to S3
+    POST /api/s3/upload/user-profile
+    """
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        # Check if file is provided
+        if 'photo' not in request.files:
+            return jsonify({'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Read file data
+        file_data = file.read()
+        
+        # Upload to S3
+        result = s3_service.upload_photo(
+            file_data=file_data,
+            file_type='user_profile',
+            user_id=current_user_id
+        )
+        
+        if not result['success']:
+            return jsonify({'error': result['error']}), 500
+        
+        # Update user profile photo in database
+        user = User.query.get(current_user_id)
+        if user:
+            user.profile_photo_url = result['url']
+            user.profile_photo_filename = result['filename']
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Profile photo uploaded successfully',
+                'photo_url': result['url'],
+                'filename': result['filename']
+            }), 200
+        else:
+            return jsonify({'error': 'User not found'}), 404
+            
+    except Exception as e:
+        current_app.logger.error(f"User profile photo upload error: {e}")
+        return jsonify({
+            'error': 'Upload failed',
+            'message': str(e)
+        }), 500
+
+@s3_bp.route('/upload/dog-photo', methods=['POST'])
+@jwt_required()
+def upload_dog_photo():
+    """
+    Upload dog photo to S3
+    POST /api/s3/upload/dog-photo
+    """
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        # Get dog_id from form data
+        dog_id = request.form.get('dog_id')
+        if not dog_id:
+            return jsonify({'error': 'Dog ID is required'}), 400
+        
+        # Verify user owns the dog
+        dog = Dog.query.filter_by(id=dog_id, owner_id=current_user_id).first()
+        if not dog:
+            return jsonify({'error': 'Dog not found or access denied'}), 404
+        
+        # Check if file is provided
+        if 'photo' not in request.files:
+            return jsonify({'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Read file data
+        file_data = file.read()
+        
+        # Upload to S3
+        result = s3_service.upload_photo(
+            file_data=file_data,
+            file_type='dog_photo',
+            user_id=current_user_id,
+            dog_id=dog_id
+        )
+        
+        if not result['success']:
+            return jsonify({'error': result['error']}), 500
+        
+        # Create photo record in database
+        photo = Photo(
+            dog_id=dog_id,
+            url=result['url'],
+            filename=result['filename'],
+            s3_key=result['key'],
+            content_type=result['content_type'],
+            is_primary=len(dog.photos) == 0  # First photo is primary
+        )
+        
+        db.session.add(photo)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Dog photo uploaded successfully',
+            'photo': photo.to_dict()
+        }), 201
+        
+    except Exception as e:
+        current_app.logger.error(f"Dog photo upload error: {e}")
+        return jsonify({
+            'error': 'Upload failed',
+            'message': str(e)
+        }), 500
+
+@s3_bp.route('/delete/photo/<int:photo_id>', methods=['DELETE'])
+@jwt_required()
+def delete_photo(photo_id):
+    """
+    Delete a photo from S3 and database
+    DELETE /api/s3/delete/photo/<photo_id>
+    """
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        # Find the photo
+        photo = Photo.query.get(photo_id)
+        if not photo:
+            return jsonify({'error': 'Photo not found'}), 404
+        
+        # Verify user owns the dog
+        if photo.dog.owner_id != current_user_id:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Delete from S3 if it's an S3 photo
+        if photo.is_s3_photo() and photo.s3_key:
+            delete_result = s3_service.delete_photo(photo.s3_key)
+            if not delete_result['success']:
+                current_app.logger.warning(f"Failed to delete S3 photo: {delete_result['error']}")
+        
+        # Delete from database
+        db.session.delete(photo)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Photo deleted successfully'
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Photo deletion error: {e}")
+        return jsonify({
+            'error': 'Deletion failed',
+            'message': str(e)
+        }), 500
