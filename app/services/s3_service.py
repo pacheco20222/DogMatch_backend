@@ -14,7 +14,7 @@ class S3Service:
     
     def __init__(self):
         self.bucket_name = 'dogmatch-bucket'
-        self.region = 'us-east-1'  # Change to your S3 region
+        self.region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
         
         # Initialize S3 client
         try:
