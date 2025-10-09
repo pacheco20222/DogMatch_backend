@@ -68,8 +68,9 @@ class S3Service:
                 Bucket=self.bucket_name,
                 Key=s3_key,
                 Body=file_data,
-                ContentType=content_type,
-                ACL='public-read'  # Make photos publicly accessible
+                ContentType=content_type
+                # Note: ACL removed as modern S3 buckets often have ACLs disabled
+                # Photos will be accessible via the public URL if bucket policy allows
             )
             
             # Generate public URL

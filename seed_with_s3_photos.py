@@ -148,7 +148,11 @@ def make_request(method, endpoint, data=None, headers=None, files=None):
         if method.upper() == 'GET':
             response = requests.get(url, headers=headers, timeout=30)
         elif method.upper() == 'POST':
-            response = requests.post(url, json=data, headers=headers, files=files, timeout=30)
+            # Use form data when files are present, JSON otherwise
+            if files:
+                response = requests.post(url, data=data, headers=headers, files=files, timeout=30)
+            else:
+                response = requests.post(url, json=data, headers=headers, timeout=30)
         elif method.upper() == 'PUT':
             response = requests.put(url, json=data, headers=headers, timeout=30)
         elif method.upper() == 'DELETE':
@@ -257,7 +261,7 @@ def upload_dog_photo(token, dog_id, photo_path):
     try:
         with open(photo_path, 'rb') as photo_file:
             files = {'photo': photo_file}
-            data = {'dog_id': dog_id}
+            data = {'dog_id': str(dog_id)}  # Convert to string for form data
             response = make_request('POST', '/s3/upload/dog-photo', data=data, headers=headers, files=files)
         
         if response and response.status_code == 201:
@@ -376,11 +380,16 @@ def seed_database_with_photos():
                 
                 result = create_dog(token, dog_data)
                 if result:
-                    dog_id = result.get('dog', {}).get('id')
-                    all_dogs.append({
-                        'dog_id': dog_id,
-                        'owner_email': user_data['email']
-                    })
+                    # Try different possible response structures
+                    dog_id = (result.get('Dog', {}).get('id') or 
+                             result.get('dog', {}).get('id') or 
+                             result.get('id') or 
+                             result.get('dog_id'))
+                    if dog_id:
+                        all_dogs.append({
+                            'dog_id': dog_id,
+                            'owner_email': user_data['email']
+                        })
                     
                     # Upload dog photo if available
                     photo_index = len(all_dogs) - 1
