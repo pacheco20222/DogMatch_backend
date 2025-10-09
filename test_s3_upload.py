@@ -100,11 +100,10 @@ def test_dog_photo_upload(token):
     print(f"✅ Test dog created: {dog_result}")
     
     # Try to get dog ID from response
-    dog_id = None
-    if 'dog' in dog_result:
-        dog_id = dog_result['dog'].get('id')
-    elif 'id' in dog_result:
-        dog_id = dog_result['id']
+    dog_id = (dog_result.get('Dog', {}).get('id') or 
+              dog_result.get('dog', {}).get('id') or 
+              dog_result.get('id') or 
+              dog_result.get('dog_id'))
     
     if not dog_id:
         print(f"❌ Could not extract dog ID from response: {dog_result}")
