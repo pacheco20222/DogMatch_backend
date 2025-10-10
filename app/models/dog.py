@@ -126,7 +126,10 @@ class Dog(db.Model):
     def get_primary_photo_url(self):
         """Get primary photo URL or default placeholder"""
         primary_photo = self.get_primary_photo()
-        return primary_photo.url if primary_photo else '/static/images/default-dog.jpg'
+        if primary_photo:
+            # Use the photo's to_dict method to get signed URL
+            return primary_photo.to_dict()['url']
+        return '/static/images/default-dog.jpg'
     
     def increment_view_count(self):
         """Increment view count when dog profile is viewed"""
@@ -314,10 +317,18 @@ class Photo(db.Model):
         return self.s3_key
     
     def to_dict(self):
+        # Generate signed URL for S3 photos
+        photo_url = self.url
+        if self.is_s3_photo() and self.s3_key:
+            from app.services.s3_service import s3_service
+            signed_url = s3_service.get_photo_url(self.s3_key)
+            if signed_url:
+                photo_url = signed_url
+        
         return {
             'id': self.id,
             'dog_id': self.dog_id,
-            'url': self.url,
+            'url': photo_url,
             'filename': self.filename,
             's3_key': self.s3_key,
             'is_primary': self.is_primary,

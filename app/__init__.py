@@ -52,6 +52,9 @@ def create_app(config_name=None):
     # Register static file serving
     register_static_routes(app)
 
+    # Initialize S3 service
+    initialize_s3_service(app)
+
     # Create upload folders if they don't exist
     upload_folder = app.config['UPLOAD_FOLDER']
     if not os.path.exists(upload_folder):
@@ -251,3 +254,10 @@ def register_static_routes(app):
             return "File not found", 404
             
         return send_from_directory(upload_folder, filename)
+
+def initialize_s3_service(app):
+    """Initialize S3 service for the app"""
+    with app.app_context():
+        from app.services.s3_service import s3_service
+        # The s3_service will be initialized when imported
+        app.logger.info("S3 service initialized")

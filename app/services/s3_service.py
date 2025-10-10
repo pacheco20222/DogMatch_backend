@@ -14,7 +14,7 @@ class S3Service:
     
     def __init__(self):
         self.bucket_name = 'dogmatch-bucket'
-        self.region = os.getenv('AWS_DEFAULT_REGION', 'us-east-1')
+        self.region = os.getenv('AWS_DEFAULT_REGION', 'us-east-2')
         
         # Initialize S3 client
         try:
@@ -146,17 +146,36 @@ class S3Service:
             # Default to jpg
             return '.jpg'
     
-    def get_photo_url(self, s3_key):
+    def get_photo_url(self, s3_key, signed=True, expiration=3600):
         """
-        Generate public URL for an S3 object
+        Generate URL for an S3 object
         
         Args:
             s3_key: S3 object key
+            signed: Whether to generate a signed URL (default: True for security)
+            expiration: Expiration time in seconds for signed URLs (default: 1 hour)
         
         Returns:
-            str: Public URL
+            str: URL (signed or public)
         """
-        return f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{s3_key}"
+        if not self.s3_client:
+            return None
+            
+        if signed:
+            try:
+                # Generate signed URL
+                url = self.s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={'Bucket': self.bucket_name, 'Key': s3_key},
+                    ExpiresIn=expiration
+                )
+                return url
+            except ClientError as e:
+                current_app.logger.error(f"Error generating signed URL: {e}")
+                return None
+        else:
+            # Public URL (requires bucket to be public)
+            return f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{s3_key}"
     
     def test_connection(self):
         """
