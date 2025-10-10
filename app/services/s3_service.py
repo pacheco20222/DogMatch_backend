@@ -54,7 +54,7 @@ class S3Service:
             if file_type == 'user_profile':
                 s3_key = f"user-photos/{user_id}/profile_{unique_filename}"
             elif file_type == 'dog_photo':
-                s3_key = f"dog-photos/{user_id}/{dog_id}/{unique_filename}"
+                s3_key = f"dog-photos/{dog_id}/photo_{unique_filename}"
             elif file_type == 'event_photo':
                 s3_key = f"event-photos/{event_id}/banner_{unique_filename}"
             else:

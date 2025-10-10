@@ -280,9 +280,12 @@ def get_sample_photos(photo_type, count):
     """Get list of sample photo files"""
     photo_dir = os.path.join(SAMPLE_IMAGES_DIR, photo_type)
     if not os.path.exists(photo_dir):
+        print(f"   ⚠️  Photo directory not found: {photo_dir}")
         return []
     
     photos = [f for f in os.listdir(photo_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))]
+    photos.sort()  # Sort for consistent ordering
+    print(f"   📁 Found {len(photos)} {photo_type}: {photos}")
     return photos[:count]
 
 def test_s3_connection(token):
@@ -335,7 +338,8 @@ def seed_database_with_photos():
     # Step 2: Login users and upload profile photos
     print("\n📸 Step 2: Uploading user profile photos...")
     user_tokens = {}
-    user_photos = get_sample_photos('user_photos', len(registered_users))
+    user_photos = get_sample_photos('user_photos', 50)  # Get all available photos
+    used_user_photos = set()  # Track which user photos have been used
     
     for i, user_info in enumerate(registered_users):
         user_data = user_info['data']
@@ -350,15 +354,22 @@ def seed_database_with_photos():
                     print("❌ S3 connection failed. Please check AWS credentials.")
                     return
             
-            # Upload profile photo if available
-            if i < len(user_photos):
-                photo_path = os.path.join(SAMPLE_IMAGES_DIR, 'user_photos', user_photos[i])
+            # Find an unused user photo
+            available_user_photos = [p for p in user_photos if p not in used_user_photos]
+            if available_user_photos:
+                selected_photo = available_user_photos[0]
+                used_user_photos.add(selected_photo)
+                photo_path = os.path.join(SAMPLE_IMAGES_DIR, 'user_photos', selected_photo)
+                print(f"   📸 Using user photo: {selected_photo}")
                 upload_user_profile_photo(token, user_info['user_id'], photo_path)
+            else:
+                print(f"   ⚠️  No more user photos available for user {user_info['user_id']}")
     
     # Step 3: Create dogs and upload photos
     print("\n🐕 Step 3: Creating dogs with photos...")
     all_dogs = []
-    dog_photos = get_sample_photos('dog_photos', 20)  # More dog photos than users
+    dog_photos = get_sample_photos('dog_photos', 50)  # Get all available photos
+    used_photos = set()  # Track which photos have been used
     
     for user_info in registered_users:
         user_data = user_info['data']
@@ -390,12 +401,17 @@ def seed_database_with_photos():
                             'dog_id': dog_id,
                             'owner_email': user_data['email']
                         })
-                    
-                    # Upload dog photo if available
-                    photo_index = len(all_dogs) - 1
-                    if photo_index < len(dog_photos):
-                        photo_path = os.path.join(SAMPLE_IMAGES_DIR, 'dog_photos', dog_photos[photo_index])
-                        upload_dog_photo(token, dog_id, photo_path)
+                        
+                        # Find an unused photo
+                        available_photos = [p for p in dog_photos if p not in used_photos]
+                        if available_photos:
+                            selected_photo = available_photos[0]
+                            used_photos.add(selected_photo)
+                            photo_path = os.path.join(SAMPLE_IMAGES_DIR, 'dog_photos', selected_photo)
+                            print(f"   📸 Using photo: {selected_photo}")
+                            upload_dog_photo(token, dog_id, photo_path)
+                        else:
+                            print(f"   ⚠️  No more photos available for dog {dog_id}")
     
     print(f"✅ Created {len(all_dogs)} dogs with photos")
     
