@@ -156,6 +156,68 @@ def upload_dog_photo():
             'message': str(e)
         }), 500
 
+@s3_bp.route('/upload/event-photo/<int:event_id>', methods=['POST'])
+@jwt_required()
+def upload_event_photo(event_id):
+    """
+    Upload event banner photo to S3
+    POST /api/s3/upload/event-photo/<event_id>
+    """
+    try:
+        current_user_id = int(get_jwt_identity())
+        
+        # Check if event exists and user has permission
+        from app.models.event import Event
+        event = Event.query.get(event_id)
+        if not event:
+            return jsonify({'error': 'Event not found'}), 404
+        
+        # Check if user is the organizer or admin
+        from app.models.user import User
+        user = User.query.get(current_user_id)
+        if event.organizer_id != current_user_id and not user.is_admin():
+            return jsonify({'error': 'Access denied. Only event organizers can upload photos.'}), 403
+        
+        # Check if file is provided
+        if 'photo' not in request.files:
+            return jsonify({'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Read file data
+        file_data = file.read()
+        
+        # Upload to S3
+        result = s3_service.upload_photo(
+            file_data=file_data,
+            file_type='event_photo',
+            user_id=current_user_id,
+            event_id=event_id
+        )
+        
+        if not result['success']:
+            return jsonify({'error': result['error']}), 500
+        
+        # Update event image in database
+        event.image_url = result['url']
+        event.image_filename = result['filename']
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Event photo uploaded successfully',
+            'photo_url': result['url'],
+            'filename': result['filename']
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Event photo upload error: {e}")
+        return jsonify({
+            'error': 'Upload failed',
+            'message': str(e)
+        }), 500
+
 @s3_bp.route('/delete/photo/<int:photo_id>', methods=['DELETE'])
 @jwt_required()
 def delete_photo(photo_id):
