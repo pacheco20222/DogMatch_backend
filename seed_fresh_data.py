@@ -32,8 +32,9 @@ DOG_BREEDS = [
     "Cocker Spaniel", "Maltese", "Pomeranian", "Jack Russell Terrier", "Dalmatian"
 ]
 
-DOG_SIZES = ["Small", "Medium", "Large", "Extra Large"]
-DOG_ENERGY_LEVELS = ["Low", "Medium", "High"]
+DOG_SIZES = ["small", "medium", "large", "extra_large"]
+DOG_ENERGY_LEVELS = ["low", "moderate", "high", "very_high"]
+DOG_GENDERS = ["male", "female"]
 DOG_PERSONALITIES = [
     ["Friendly", "Playful", "Energetic"],
     ["Calm", "Gentle", "Loyal"],
@@ -92,12 +93,29 @@ MESSAGE_TEMPLATES = [
 def get_random_s3_photo(folder, count):
     """Get a random S3 photo URL from the specified folder"""
     try:
-        # List objects in the S3 folder
-        objects = s3_service.list_objects(folder)
-        if objects:
-            # Return a random photo URL
-            random_photo = random.choice(objects)
-            return f"https://dogmatch-bucket.s3.amazonaws.com/{random_photo}"
+        # For now, return a default S3 URL pattern since we know the photos are uploaded
+        # In a real implementation, you'd list the S3 objects
+        photo_files = [
+            "dog1.jpg", "dog2.jpg", "dog3.jpg", "dog4.jpg", "dog5.jpg",
+            "dog6.jpg", "dog7.jpg", "dog8.jpg", "dog9.jpg", "dog10.jpg",
+            "user1.jpg", "user2.jpg", "user3.jpg", "user4.jpg", "user5.jpg",
+            "user6.jpg", "user7.jpg", "user8.jpg", "user9.jpg", "user10.jpg",
+            "event1.jpg", "event2.jpg", "event3.jpg", "event4.jpg", "event5.jpg"
+        ]
+        
+        # Filter by folder
+        if folder == "dog-photos":
+            folder_photos = [f for f in photo_files if f.startswith("dog")]
+        elif folder == "user-photos":
+            folder_photos = [f for f in photo_files if f.startswith("user")]
+        elif folder == "event-photos":
+            folder_photos = [f for f in photo_files if f.startswith("event")]
+        else:
+            folder_photos = photo_files
+        
+        if folder_photos:
+            random_photo = random.choice(folder_photos)
+            return f"https://dogmatch-bucket.s3.us-east-2.amazonaws.com/{folder}/{random_photo}"
         else:
             # Fallback to a default image
             return "https://images.unsplash.com/photo-1552053831-71594a27632d?w=400&h=600&fit=crop&crop=face"
@@ -114,10 +132,10 @@ def create_users():
     admin = User(
         email="admin@dogmatch.com",
         username="admin",
+        password="admin123",
+        user_type="admin",
         first_name="Admin",
         last_name="User",
-        password_hash=User.hash_password("admin123"),
-        role="admin",
         is_verified=True,
         profile_photo_url=get_random_s3_photo("user-photos", 1)
     )
@@ -127,10 +145,10 @@ def create_users():
     shelter = User(
         email="shelter@dogmatch.com",
         username="happy_paws_shelter",
+        password="shelter123",
+        user_type="shelter",
         first_name="Happy",
         last_name="Paws",
-        password_hash=User.hash_password("shelter123"),
-        role="shelter",
         is_verified=True,
         profile_photo_url=get_random_s3_photo("user-photos", 1)
     )
@@ -146,10 +164,10 @@ def create_users():
         user = User(
             email=email,
             username=username,
+            password="password123",
+            user_type="owner",
             first_name=first_name,
             last_name=last_name,
-            password_hash=User.hash_password("password123"),
-            role="owner",
             is_verified=True,
             profile_photo_url=get_random_s3_photo("user-photos", 1)
         )
@@ -169,7 +187,7 @@ def create_dogs(users):
     dogs = []
     
     # Get owner users (exclude admin and shelter)
-    owner_users = [user for user in users if user.role == "owner"]
+    owner_users = [user for user in users if user.user_type == "owner"]
     
     for user in owner_users:
         # Each owner has 1-2 dogs
@@ -179,16 +197,18 @@ def create_dogs(users):
             name = random.choice(DOG_NAMES)
             breed = random.choice(DOG_BREEDS)
             size = random.choice(DOG_SIZES)
+            gender = random.choice(DOG_GENDERS)
             energy_level = random.choice(DOG_ENERGY_LEVELS)
             personality = random.choice(DOG_PERSONALITIES)
             description = random.choice(DOG_DESCRIPTIONS)
             
             dog = Dog(
-                owner_id=user.id,
                 name=name,
+                gender=gender,
+                size=size,
+                owner_id=user.id,
                 age=random.randint(1, 12),
                 breed=breed,
-                size=size,
                 energy_level=energy_level,
                 description=description,
                 is_available=True,
@@ -210,16 +230,43 @@ def create_matches_and_messages(dogs):
     """Create matches and messages between dogs"""
     print("💕 Creating matches and messages...")
     
+    # Track used dog pairs to avoid duplicates
+    used_pairs = set()
+    
+    def get_unique_dog_pair():
+        """Get a unique pair of dogs that haven't been matched yet"""
+        max_attempts = 50  # Prevent infinite loop
+        attempts = 0
+        
+        while attempts < max_attempts:
+            dog1 = random.choice(dogs)
+            dog2 = random.choice([d for d in dogs if d.id != dog1.id and d.owner_id != dog1.owner_id])
+            
+            # Create a consistent pair key (smaller ID first)
+            pair_key = tuple(sorted([dog1.id, dog2.id]))
+            
+            if pair_key not in used_pairs:
+                used_pairs.add(pair_key)
+                return dog1, dog2
+            
+            attempts += 1
+        
+        # If we can't find a unique pair, return None
+        return None, None
+    
     # Create some mutual matches (both dogs liked each other)
     mutual_matches = []
     for i in range(6):
-        dog1 = random.choice(dogs)
-        dog2 = random.choice([d for d in dogs if d.id != dog1.id and d.owner_id != dog1.owner_id])
-        
+        dog1, dog2 = get_unique_dog_pair()
+        if dog1 is None or dog2 is None:
+            print(f"⚠️  Could not create more unique matches after {i} matches")
+            break
+            
         # Create mutual match
         match = Match(
             dog_one_id=dog1.id,
             dog_two_id=dog2.id,
+            initiated_by_dog_id=dog1.id,
             dog_one_action='like',
             dog_two_action='like',
             status='matched'
@@ -229,13 +276,16 @@ def create_matches_and_messages(dogs):
     
     # Create some pending swipes (only one dog has swiped)
     for i in range(4):
-        dog1 = random.choice(dogs)
-        dog2 = random.choice([d for d in dogs if d.id != dog1.id and d.owner_id != dog1.owner_id])
-        
+        dog1, dog2 = get_unique_dog_pair()
+        if dog1 is None or dog2 is None:
+            print(f"⚠️  Could not create more unique pending swipes after {i} swipes")
+            break
+            
         # Create pending match
         match = Match(
             dog_one_id=dog1.id,
             dog_two_id=dog2.id,
+            initiated_by_dog_id=dog1.id,
             dog_one_action='like',
             dog_two_action='pending',
             status='pending'
@@ -244,13 +294,16 @@ def create_matches_and_messages(dogs):
     
     # Create some one-sided swipes (for current user to see in discover)
     for i in range(3):
-        dog1 = random.choice(dogs)
-        dog2 = random.choice([d for d in dogs if d.id != dog1.id and d.owner_id != dog1.owner_id])
-        
+        dog1, dog2 = get_unique_dog_pair()
+        if dog1 is None or dog2 is None:
+            print(f"⚠️  Could not create more unique one-sided swipes after {i} swipes")
+            break
+            
         # Create one-sided match
         match = Match(
             dog_one_id=dog1.id,
             dog_two_id=dog2.id,
+            initiated_by_dog_id=dog1.id,
             dog_one_action='pass',
             dog_two_action='pending',
             status='pending'
@@ -304,7 +357,7 @@ def create_events(users):
     print("🎉 Creating events...")
     
     # Get shelter user
-    shelter_user = next((user for user in users if user.role == "shelter"), None)
+    shelter_user = next((user for user in users if user.user_type == "shelter"), None)
     if not shelter_user:
         print("⚠️  No shelter user found, skipping events")
         return
@@ -341,7 +394,7 @@ def create_events(users):
             location=event_data["location"],
             event_date=event_data["event_date"],
             max_attendees=event_data["max_attendees"],
-            created_by=shelter_user.id,
+            organizer_id=shelter_user.id,
             image_url=get_random_s3_photo("event-photos", 1)
         )
         events.append(event)

@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
-from datetime import datetime
+from datetime import datetime, date
 
 from app import db
 from app.models import (
@@ -333,17 +333,31 @@ def get_conversations():
                 'count': 0
             }), 200
         
-        # Get matches with messages
-        matches_with_messages = Match.query.filter(
+        # Get all matched matches for the user
+        user_matches = Match.query.filter(
             db.or_(
                 Match.dog_one_id.in_(user_dog_ids),
                 Match.dog_two_id.in_(user_dog_ids)
             ),
             Match.status == 'matched',
             Match.is_active == True,
-            Match.is_archived == False,
-            Match.message_count > 0
-        ).order_by(Match.last_message_at.desc()).all()
+            Match.is_archived == False
+        ).all()
+        
+        # Filter to only include matches that have messages
+        matches_with_messages = []
+        for match in user_matches:
+            # Check if this match has any messages
+            has_messages = Message.query.filter(
+                Message.match_id == match.id,
+                Message.is_deleted == False
+            ).first() is not None
+            
+            if has_messages:
+                matches_with_messages.append(match)
+        
+        # Sort by last message time
+        matches_with_messages.sort(key=lambda m: m.last_message_at or datetime(1970, 1, 1), reverse=True)
         
         conversations = []
         for match in matches_with_messages:
@@ -371,12 +385,14 @@ def get_conversations():
             conversations.append(conversation_data)
         
         return jsonify({
+            'success': True,
             'conversations': conversations,
             'count': len(conversations)
         }), 200
         
     except Exception as e:
         return jsonify({
+            'success': False,
             'error': 'Failed to get conversations',
             'message': str(e)
         }), 500

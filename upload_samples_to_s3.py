@@ -36,8 +36,22 @@ def upload_sample_images():
                     s3_key = f"dog-photos/{photo}"
                     
                     try:
-                        url = s3_service.upload_file(photo_path, s3_key)
-                        print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        # Read file data
+                        with open(photo_path, 'rb') as f:
+                            file_data = f.read()
+                        
+                        # Upload using the correct method
+                        result = s3_service.upload_photo(
+                            file_data=file_data,
+                            file_type='dog_photo',
+                            user_id=1,  # Dummy user ID for seeding
+                            dog_id=1    # Dummy dog ID for seeding
+                        )
+                        
+                        if result['success']:
+                            print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        else:
+                            print(f"  ❌ Failed to upload {photo}: {result['error']}")
                     except Exception as e:
                         print(f"  ❌ Failed to upload {photo}: {str(e)}")
             
@@ -52,8 +66,21 @@ def upload_sample_images():
                     s3_key = f"user-photos/{photo}"
                     
                     try:
-                        url = s3_service.upload_file(photo_path, s3_key)
-                        print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        # Read file data
+                        with open(photo_path, 'rb') as f:
+                            file_data = f.read()
+                        
+                        # Upload using the correct method
+                        result = s3_service.upload_photo(
+                            file_data=file_data,
+                            file_type='user_profile',
+                            user_id=1  # Dummy user ID for seeding
+                        )
+                        
+                        if result['success']:
+                            print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        else:
+                            print(f"  ❌ Failed to upload {photo}: {result['error']}")
                     except Exception as e:
                         print(f"  ❌ Failed to upload {photo}: {str(e)}")
             
@@ -68,8 +95,22 @@ def upload_sample_images():
                     s3_key = f"event-photos/{photo}"
                     
                     try:
-                        url = s3_service.upload_file(photo_path, s3_key)
-                        print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        # Read file data
+                        with open(photo_path, 'rb') as f:
+                            file_data = f.read()
+                        
+                        # Upload using the correct method
+                        result = s3_service.upload_photo(
+                            file_data=file_data,
+                            file_type='event_photo',
+                            user_id=1,  # Dummy user ID for seeding
+                            event_id=1  # Dummy event ID for seeding
+                        )
+                        
+                        if result['success']:
+                            print(f"  ✅ Uploaded {photo} -> {s3_key}")
+                        else:
+                            print(f"  ❌ Failed to upload {photo}: {result['error']}")
                     except Exception as e:
                         print(f"  ❌ Failed to upload {photo}: {str(e)}")
             

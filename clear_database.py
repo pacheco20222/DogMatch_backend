@@ -12,7 +12,8 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app import create_app, db
-from app.models import User, Dog, Match, Message, Event, EventRegistration
+from app.models import User, Dog, Match, Message, Event, EventRegistration, Photo
+from sqlalchemy import text
 
 def clear_database():
     """Clear all data from the database"""
@@ -21,6 +22,9 @@ def clear_database():
     with app.app_context():
         try:
             print("🗑️  Starting database cleanup...")
+            
+            # Disable foreign key checks temporarily
+            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
             
             # Delete in reverse order of dependencies to avoid foreign key constraints
             print("📧 Deleting messages...")
@@ -35,11 +39,17 @@ def clear_database():
             print("🎉 Deleting events...")
             Event.query.delete()
             
+            print("📸 Deleting dog photos...")
+            Photo.query.delete()
+            
             print("🐕 Deleting dogs...")
             Dog.query.delete()
             
             print("👤 Deleting users...")
             User.query.delete()
+            
+            # Re-enable foreign key checks
+            db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             
             # Commit all deletions
             db.session.commit()
@@ -50,6 +60,12 @@ def clear_database():
         except Exception as e:
             print(f"❌ Error clearing database: {str(e)}")
             db.session.rollback()
+            # Re-enable foreign key checks even if there was an error
+            try:
+                db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+                db.session.commit()
+            except:
+                pass
             raise
 
 if __name__ == "__main__":
