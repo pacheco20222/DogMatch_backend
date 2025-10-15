@@ -39,36 +39,14 @@ def create_app(config_name=None):
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
     ma.init_app(app)
     
-    # Initialize Socket.IO with conditional Redis
-    REDIS_URL = os.getenv('REDIS_URL')  # Render provides this
-    print(f"🔌 Redis URL configured: {REDIS_URL is not None}")
-    if REDIS_URL:
-        print(f"🔌 Using Redis for Socket.IO: {REDIS_URL[:20]}...")
-        try:
-            # Production: Use Redis for message queue with threading
-            socketio.init_app(app, 
-                             cors_allowed_origins="*", 
-                             message_queue=REDIS_URL,
-                             async_mode='threading',
-                             logger=True,
-                             engineio_logger=True)
-            print("✅ Socket.IO initialized with Redis successfully")
-        except Exception as e:
-            print(f"❌ Failed to initialize Socket.IO with Redis: {e}")
-            # Fallback to no Redis
-            socketio.init_app(app, 
-                             cors_allowed_origins="*",
-                             async_mode='threading',
-                             logger=True,
-                             engineio_logger=True)
-            print("✅ Socket.IO initialized without Redis (fallback)")
-    else:
-        print("🔌 No Redis URL found, using threading mode")
-        # Development: Use threading (no Redis needed)
-        socketio.init_app(app, 
-                         cors_allowed_origins="*",
-                         async_mode='threading')
-        print("✅ Socket.IO initialized without Redis")
+    # Initialize Socket.IO without Redis (Render free tier compatibility)
+    print("🔌 Initializing Socket.IO without Redis for Render compatibility")
+    socketio.init_app(app, 
+                     cors_allowed_origins="*",
+                     async_mode='threading',
+                     logger=True,
+                     engineio_logger=True)
+    print("✅ Socket.IO initialized successfully (no Redis)")
     
     # Register blueprints (route modules)
     register_blueprints(app)
