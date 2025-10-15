@@ -49,14 +49,18 @@ def create_app(config_name=None):
             socketio.init_app(app, 
                              cors_allowed_origins="*", 
                              message_queue=REDIS_URL,
-                             async_mode='threading')
+                             async_mode='threading',
+                             logger=True,
+                             engineio_logger=True)
             print("✅ Socket.IO initialized with Redis successfully")
         except Exception as e:
             print(f"❌ Failed to initialize Socket.IO with Redis: {e}")
             # Fallback to no Redis
             socketio.init_app(app, 
                              cors_allowed_origins="*",
-                             async_mode='threading')
+                             async_mode='threading',
+                             logger=True,
+                             engineio_logger=True)
             print("✅ Socket.IO initialized without Redis (fallback)")
     else:
         print("🔌 No Redis URL found, using threading mode")
