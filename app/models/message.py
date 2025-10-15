@@ -354,7 +354,7 @@ class MessageResponseSchema(ma.Schema):
 class MessageListSchema(ma.Schema):
     """Schema for listing messages with filters"""
     
-    match_id = fields.Int(required=True)
+    match_id = fields.Int(required=False)  # Not required since it's in the URL path
     limit = fields.Int(validate=validate.Range(min=1, max=100), missing=50)
     offset = fields.Int(validate=validate.Range(min=0), missing=0)
     before_message_id = fields.Int()  # For pagination

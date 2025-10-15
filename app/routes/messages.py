@@ -133,6 +133,7 @@ def get_messages(match_id):
         messages_data = [msg.to_dict(current_user_id=current_user_id) for msg in messages]
         
         return jsonify({
+            'success': True,
             'messages': messages_data,
             'count': len(messages_data),
             'limit': limit,
@@ -146,11 +147,13 @@ def get_messages(match_id):
         
     except ValidationError as e:
         return jsonify({
+            'success': False,
             'error': 'Validation failed',
             'messages': e.messages
         }), 400
     except Exception as e:
         return jsonify({
+            'success': False,
             'error': 'Failed to get messages',
             'message': str(e)
         }), 500
