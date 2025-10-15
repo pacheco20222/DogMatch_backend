@@ -3,7 +3,7 @@ from flask import request
 from flask_jwt_extended import decode_token
 from flask_socketio import emit, join_room, leave_room, disconnect
 from app import socketio, db
-from app.models import User, Match, Message
+from app.models import User, Match, Message, Dog
 from datetime import datetime
 import logging
 
@@ -54,6 +54,7 @@ def handle_connect():
     user_rooms[request.sid] = []
     
     logger.info(f"User {user.id} ({user.email}) connected with socket {request.sid}")
+    logger.info(f"📱 Active users: {list(active_users.keys())}")
     
     # Emit connection confirmation
     emit('connected', {
@@ -214,11 +215,44 @@ def handle_send_message(data):
         match.update_message_stats()
         
         # Prepare message data for broadcast
-        message_data = message.to_dict(current_user_id=user.id)
+        # Send to sender with is_sent_by_me=True
+        sender_message_data = message.to_dict(current_user_id=user.id)
+        
+        # Send to other users with is_sent_by_me=False
+        recipient_message_data = message.to_dict(current_user_id=None)
+        recipient_message_data['is_sent_by_me'] = False
         
         # Broadcast to all users in the match room
         room_name = f"match_{match_id}"
-        emit('new_message', message_data, room=room_name)
+        
+        # Send to sender
+        emit('new_message', sender_message_data)
+        
+        # Send to other users in the room (excluding sender)
+        emit('new_message', recipient_message_data, room=room_name, include_self=False)
+        
+        # Also send to all users involved in the match (for notifications when outside chat)
+        # Get the other user involved in this match
+        other_user_id = None
+        if match.dog_one_id in user_dog_ids:
+            # Current user owns dog_one, so other user owns dog_two
+            other_dog = Dog.query.get(match.dog_two_id)
+            if other_dog:
+                other_user_id = other_dog.owner_id
+        else:
+            # Current user owns dog_two, so other user owns dog_one
+            other_dog = Dog.query.get(match.dog_one_id)
+            if other_dog:
+                other_user_id = other_dog.owner_id
+        
+        # Send notification to the other user if they're online
+        if other_user_id and other_user_id in active_users:
+            logger.info(f"📱 Sending notification to user {other_user_id} for match {match_id}")
+            for socket_id in active_users[other_user_id]:
+                emit('new_message', recipient_message_data, room=socket_id)
+                logger.info(f"📱 Sent notification to socket {socket_id}")
+        else:
+            logger.info(f"📱 User {other_user_id} not online or not found in active_users")
         
         logger.info(f"Message sent in match {match_id} by user {user.id}")
         
