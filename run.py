@@ -1,5 +1,5 @@
 ﻿import os 
-from app import create_app
+from app import create_app, socketio
 
 app = create_app()
 
@@ -9,11 +9,11 @@ if __name__ == "__main__":
     host = os.environ.get('HOST', '127.0.0.1')
     
     print("Backend is starting")
-    print("The backend is running on http://{host}:{port}")
+    print(f"The backend is running on http://{host}:{port}")
 
-    app.run(
+    socketio.run(
+        app,
         host=host,
         port=port,
-        debug=debug_mode,
-        threaded=True
+        debug=debug_mode
     )

@@ -285,7 +285,7 @@ def delete_dog(dog_id):
 @jwt_required()
 def discover_dogs():
     """
-    Get dogs for swiping (excludes user's own dogs)
+    Get dogs for swiping (excludes user's own dogs and already-swiped dogs)
     GET /api/dogs/discover?limit=10
     """
     try:
@@ -298,11 +298,41 @@ def discover_dogs():
         user_latitude = request.args.get('user_latitude')
         user_longitude = request.args.get('user_longitude')
         
-        # Build query - exclude user's own dogs
+        # Get user's dog IDs
+        user_dog_ids = [dog.id for dog in Dog.query.filter(Dog.owner_id == current_user_id).all()]
+        
+        if not user_dog_ids:
+            return jsonify({
+                'dogs': [],
+                'count': 0,
+                'message': 'You need to create a dog profile first'
+            }), 200
+        
+        # Get dogs that user has already swiped on (any action)
+        from app.models.match import Match
+        swiped_dog_ids = set()
+        
+        # Find all matches where user's dogs have swiped (any action)
+        matches = Match.query.filter(
+            db.or_(
+                Match.dog_one_id.in_(user_dog_ids),
+                Match.dog_two_id.in_(user_dog_ids)
+            )
+        ).all()
+        
+        for match in matches:
+            # Add the other dog's ID to swiped list
+            if match.dog_one_id in user_dog_ids:
+                swiped_dog_ids.add(match.dog_two_id)
+            else:
+                swiped_dog_ids.add(match.dog_one_id)
+        
+        # Build query - exclude user's own dogs and already-swiped dogs
         query = Dog.query.filter(
             Dog.owner_id != current_user_id,
             Dog.is_available == True,
-            Dog.is_adopted == False
+            Dog.is_adopted == False,
+            ~Dog.id.in_(swiped_dog_ids)  # Exclude already-swiped dogs
         )
         
         # Apply preferences
@@ -310,17 +340,17 @@ def discover_dogs():
             query = query.filter(Dog.size == size_preference)
         
         # TODO: Add distance filtering when lat/lng provided
-        # TODO: Add already-swiped exclusion (requires Match model integration)
         
         # Get random selection of dogs
         dogs = query.order_by(db.func.random()).limit(limit).all()
         
-        # Convert to dict
+        # Convert to dict with owner information
         dogs_data = [dog.to_dict(include_owner=True, include_photos=True) for dog in dogs]
         
         return jsonify({
             'dogs': dogs_data,
-            'count': len(dogs_data)
+            'count': len(dogs_data),
+            'swiped_count': len(swiped_dog_ids)
         }), 200
         
     except Exception as e:

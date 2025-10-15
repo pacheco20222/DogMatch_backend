@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
+from flask_socketio import SocketIO
 from datetime import datetime
 import os
 
@@ -13,6 +14,7 @@ migrate = Migrate()
 jwt = JWTManager()
 cors = CORS()
 ma = Marshmallow()
+socketio = SocketIO()
 
 def create_app(config_name=None):
     """
@@ -37,8 +39,25 @@ def create_app(config_name=None):
     cors.init_app(app, origins=app.config['CORS_ORIGINS'])
     ma.init_app(app)
     
+    # Initialize Socket.IO with conditional Redis
+    REDIS_URL = os.getenv('REDIS_URL')  # Render provides this
+    if REDIS_URL:
+        # Production: Use Redis for message queue with threading
+        socketio.init_app(app, 
+                         cors_allowed_origins="*", 
+                         message_queue=REDIS_URL,
+                         async_mode='threading')
+    else:
+        # Development: Use threading (no Redis needed)
+        socketio.init_app(app, 
+                         cors_allowed_origins="*",
+                         async_mode='threading')
+    
     # Register blueprints (route modules)
     register_blueprints(app)
+    
+    # Register socket events
+    register_socket_events(app)
     
     # Register error handlers
     register_error_handlers(app)
@@ -93,7 +112,10 @@ def register_blueprints(app):
     app.register_blueprint(migrate_bp, url_prefix='/api/migrate')
     app.register_blueprint(s3_bp, url_prefix='/api/s3')
     
-    pass  # No routes for now
+def register_socket_events(app):
+    """Register Socket.IO event handlers"""
+    # Import socket events to register them
+    from app.sockets import chat_events
 
 def register_error_handlers(app):
     """Register global error handlers"""

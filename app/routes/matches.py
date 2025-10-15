@@ -354,3 +354,79 @@ def get_match_stats():
             'error': 'Failed to get match stats',
             'message': str(e)
         }), 500
+
+
+@matches_bp.route('/<int:match_id>/respond', methods=['POST'])
+@jwt_required()
+def respond_to_swipe(match_id):
+    """
+    Respond to a pending swipe (accept/reject)
+    POST /api/matches/123/respond
+    """
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({"error": "Could not validate user"}), 404
+        
+        # Get and validate match
+        match = Match.query.get(match_id)
+        if not match:
+            return jsonify({'error': 'Match not found'}), 404
+        
+        # Check if user is part of this match
+        user_dog_ids = [dog.id for dog in Dog.query.filter(Dog.owner_id == current_user_id).all()]
+        if match.dog_one_id not in user_dog_ids and match.dog_two_id not in user_dog_ids:
+            return jsonify({'error': 'You are not part of this match'}), 403
+        
+        # Validate input data
+        data = request.json
+        if not data or 'action' not in data:
+            return jsonify({'error': 'Action is required'}), 400
+        
+        action = data['action']
+        if action not in ['like', 'pass', 'super_like']:
+            return jsonify({'error': 'Invalid action. Must be like, pass, or super_like'}), 400
+        
+        # Check if user's dog has already responded
+        user_dog_id = None
+        for dog_id in user_dog_ids:
+            if dog_id == match.dog_one_id:
+                user_dog_id = match.dog_one_id
+                current_action = match.dog_one_action
+                break
+            elif dog_id == match.dog_two_id:
+                user_dog_id = match.dog_two_id
+                current_action = match.dog_two_action
+                break
+        
+        if not user_dog_id:
+            return jsonify({'error': 'You are not part of this match'}), 403
+        
+        if current_action != 'pending':
+            return jsonify({'error': 'You have already responded to this swipe'}), 400
+        
+        # Update the user's dog's action
+        match.update_action(user_dog_id, action)
+        
+        # Prepare response
+        response_data = {
+            'message': f'Successfully {action}d the swipe',
+            'match': match.to_dict(current_user_id=current_user_id, include_dogs=True),
+            'is_mutual_match': match.is_mutual_match()
+        }
+        
+        # Add special message for mutual matches
+        if match.is_mutual_match():
+            other_dog = match.get_other_dog(user_dog_id)
+            response_data['message'] = f"It's a match! You and {other_dog.owner.get_full_name()} can now chat!"
+        
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Failed to respond to swipe',
+            'message': str(e)
+        }), 500
