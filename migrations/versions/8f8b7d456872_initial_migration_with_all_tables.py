@@ -1,8 +1,8 @@
-"""Initial models: User, Dog, Match, Message, Event, EventRegistration
+"""Initial migration with all tables
 
-Revision ID: 75b0da93df76
+Revision ID: 8f8b7d456872
 Revises: 
-Create Date: 2025-09-20 15:33:03.171181
+Create Date: 2025-10-21 17:08:52.411397
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '75b0da93df76'
+revision = '8f8b7d456872'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -34,6 +34,8 @@ def upgrade():
     sa.Column('city', sa.String(length=100), nullable=True),
     sa.Column('state', sa.String(length=100), nullable=True),
     sa.Column('country', sa.String(length=100), nullable=True),
+    sa.Column('profile_photo_url', sa.String(length=500), nullable=True),
+    sa.Column('profile_photo_filename', sa.String(length=255), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('is_verified', sa.Boolean(), nullable=False),
     sa.Column('failed_login_attempts', sa.Integer(), nullable=False),
@@ -145,7 +147,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('event_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('dog_id', sa.Integer(), nullable=False),
+    sa.Column('dog_id', sa.Integer(), nullable=True),
     sa.Column('status', sa.Enum('pending', 'confirmed', 'rejected', 'cancelled', 'waitlisted', name='registration_status_enum'), nullable=False),
     sa.Column('registration_code', sa.String(length=20), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
@@ -211,10 +213,12 @@ def upgrade():
     sa.Column('dog_id', sa.Integer(), nullable=False),
     sa.Column('url', sa.String(length=500), nullable=False),
     sa.Column('filename', sa.String(length=255), nullable=True),
+    sa.Column('s3_key', sa.String(length=500), nullable=True),
     sa.Column('is_primary', sa.Boolean(), nullable=False),
     sa.Column('file_size', sa.Integer(), nullable=True),
     sa.Column('width', sa.Integer(), nullable=True),
     sa.Column('height', sa.Integer(), nullable=True),
+    sa.Column('content_type', sa.String(length=100), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['dog_id'], ['dogs.id'], ),
     sa.PrimaryKeyConstraint('id')
