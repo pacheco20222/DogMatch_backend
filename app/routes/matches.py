@@ -57,6 +57,8 @@ def swipe_on_dog():
                 initiated_by_dog_id=user_dog.id,
                 action=action
             )
+            print(f"✅ Created match {match.id}: dog_one={match.dog_one_id} (action={match.dog_one_action}), dog_two={match.dog_two_id} (action={match.dog_two_action}), initiated_by={match.initiated_by_dog_id}")
+        
         # Increment like count if it's a like or super_like
         if action in ['like', 'super_like']:
             target_dog.increment_like_count()
@@ -242,6 +244,8 @@ def get_pending_matches():
         # Get user's dog IDs
         user_dog_ids = [dog.id for dog in Dog.query.filter(Dog.owner_id == current_user_id).all()]
         
+        print(f"🔍 Pending swipes for user {current_user_id}, dog IDs: {user_dog_ids}")
+        
         if not user_dog_ids:
             return jsonify({
                 'pending_matches': [],
@@ -258,11 +262,19 @@ def get_pending_matches():
                 Match.dog_one_action == 'pending'
             ).all()
             
+            print(f"  Dog {user_dog_id} as dog_one: {len(matches_as_dog_one)} pending matches")
+            for m in matches_as_dog_one:
+                print(f"    Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
+            
             # Matches where user's dog is dog_two and action is pending
             matches_as_dog_two = Match.query.filter(
                 Match.dog_two_id == user_dog_id,
                 Match.dog_two_action == 'pending'
             ).all()
+            
+            print(f"  Dog {user_dog_id} as dog_two: {len(matches_as_dog_two)} pending matches")
+            for m in matches_as_dog_two:
+                print(f"    Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
             
             pending_matches.extend(matches_as_dog_one)
             pending_matches.extend(matches_as_dog_two)

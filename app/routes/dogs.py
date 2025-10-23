@@ -7,6 +7,7 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 from app import db
+from app.services.s3_service import S3Service
 
 from app.models import(
     Dog, Photo, User,
@@ -20,35 +21,31 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
-def save_uploaded_file(file, dog_id):
-    """Save uploaded file and return the filename and URL"""
+def save_uploaded_file(file, dog_id, user_id):
+    """Upload file to S3 and return the S3 URL, key, and filename"""
     if file and allowed_file(file.filename):
-        # Generate unique filename
-        filename = secure_filename(file.filename)
-        file_extension = filename.rsplit('.', 1)[1].lower()
-        unique_filename = f"{dog_id}_{uuid.uuid4().hex}.{file_extension}"
+        # Initialize S3 service
+        s3_service = S3Service()
         
-        # Save file
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        file_path = os.path.join(upload_folder, unique_filename)
+        # Read file data
+        file_data = file.read()
         
-        # Ensure directory exists
-        os.makedirs(upload_folder, exist_ok=True)
+        # Upload to S3
+        result = s3_service.upload_photo(
+            file_data=file_data,
+            file_type='dog_photo',
+            user_id=user_id,
+            dog_id=dog_id
+        )
         
-        # Save file
-        file.save(file_path)
-        
-        # Verify file was saved
-        if os.path.exists(file_path):
-            print(f"✅ File saved successfully: {file_path}")
+        if result['success']:
+            print(f"✅ File uploaded to S3: {result['key']}")
+            return result['filename'], result['url'], result['key']
         else:
-            print(f"❌ File save failed: {file_path}")
-        
-        # Return relative URL for database storage
-        relative_url = f"/static/dog_photos/{unique_filename}"
-        return unique_filename, relative_url
+            print(f"❌ S3 upload failed: {result.get('error')}")
+            return None, None, None
     
-    return None, None
+    return None, None, None
 
 @dogs_bp.route("/", methods=["POST"], strict_slashes=False)
 @jwt_required()
@@ -60,16 +57,20 @@ def create_dog():
         if not user:
             return jsonify({"Error":"Invalid User, User has not been found"}), 404
         
+        # Log incoming data for debugging
+        print("Incoming request data:", request.json)
+        
         schema = DogCreateSchema()
         data = schema.load(request.json)
+        
+        print("Validated data:", data)
         
         dog = Dog(
             name=data['name'],
             gender=data['gender'],
             size=data['size'],
             owner_id=current_user_id,
-            age=data.get('age'),
-            age_months=data.get('age_months'),
+            age_years=data.get('age_years'),
             breed=data.get('breed'),
             weight=data.get('weight'),
             color=data.get('color'),
@@ -83,8 +84,6 @@ def create_dog():
             special_needs=data.get('special_needs'),
             description=data.get('description'),
             location=data.get('location'),
-            latitude=data.get('latitude'),
-            longitude=data.get('longitude'),
             availability_type=data.get('availability_type', 'playdate'),
             adoption_fee=data.get('adoption_fee')
         )
@@ -96,17 +95,22 @@ def create_dog():
         db.session.commit()
         
         return jsonify({
-            "Message":"Dog created",
-            "Dog": dog.to_dict(include_owner=True, include_photos=True)
+            "message": "Dog created successfully",
+            "dog": dog.to_dict(include_owner=True, include_photos=True)
         }), 201
         
     except ValidationError as e:
+        print("Validation error:", e.messages)
         return jsonify({
             "Error":"Validation Error",
             "Message": e.messages
         }), 400
         
     except Exception as e:
+        print("Exception creating dog:", str(e))
+        print("Exception type:", type(e))
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return jsonify({
             'error': 'Failed to create dog profile',
@@ -408,6 +412,12 @@ def add_dog_photo(dog_id):
         if dog.owner_id != current_user_id:
             return jsonify({'error': 'You can only add photos to your own dogs'}), 403
         
+        # Debug logging
+        print("Request files:", request.files)
+        print("Request form:", request.form)
+        print("Request content type:", request.content_type)
+        print("Request is_json:", request.is_json)
+        
         # Handle file upload
         if 'photo' in request.files:
             file = request.files['photo']
@@ -416,17 +426,18 @@ def add_dog_photo(dog_id):
             if file.filename == '':
                 return jsonify({'error': 'No file selected'}), 400
             
-            # Save uploaded file
-            filename, photo_url = save_uploaded_file(file, dog_id)
+            # Upload to S3
+            filename, photo_url, s3_key = save_uploaded_file(file, dog_id, current_user_id)
             
             if not photo_url:
-                return jsonify({'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif'}), 400
+                return jsonify({'error': 'Invalid file type or upload failed. Allowed: png, jpg, jpeg, gif'}), 400
         
         # Handle JSON with URL (for external URLs or testing)
         elif request.is_json:
             data = request.json
             photo_url = data.get('url')
             filename = data.get('filename')
+            s3_key = data.get('s3_key')
             is_primary = data.get('is_primary', False)
             
             if not photo_url:
@@ -440,6 +451,7 @@ def add_dog_photo(dog_id):
             dog_id=dog_id,
             url=photo_url,
             filename=filename,
+            s3_key=s3_key,
             is_primary=is_primary
         )
         

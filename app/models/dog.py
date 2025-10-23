@@ -13,12 +13,11 @@ class Dog(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     
     name = db.Column(db.String(100), nullable=False)
-    age = db.Column(db.Integer, nullable=True)  
-    age_months = db.Column(db.Integer, nullable=True)
+    age_years = db.Column(db.Integer, nullable=True)  # Age in years
     breed = db.Column(db.String(100), nullable=True)
     gender = db.Column(db.Enum('male', 'female', name='dog_gender_enum'), nullable=False)
     size = db.Column(db.Enum('small', 'medium', 'large', 'extra_large', name='dog_size_enum'), nullable=False)
-    weight = db.Column(db.Float, nullable=True)  # KG
+    weight = db.Column(db.Float, nullable=True)  # Weight in KG
     color = db.Column(db.String(50), nullable=True)
     
     # Personality & Behavior
@@ -37,8 +36,6 @@ class Dog(db.Model):
     description = db.Column(db.Text, nullable=True)
     
     location = db.Column(db.String(200), nullable=True)  # City, State format
-    latitude = db.Column(db.Float, nullable=True)
-    longitude = db.Column(db.Float, nullable=True)
     
     # Availability & Status
     is_available = db.Column(db.Boolean, default=True, nullable=False)
@@ -84,20 +81,10 @@ class Dog(db.Model):
     
     def get_age_string(self):
         """Return formatted age string"""
-        if self.age is None and self.age_months is None:
+        if self.age_years is None:
             return "Age unknown"
         
-        if self.age and self.age_months:
-            if self.age == 0:
-                return f"{self.age_months} months"
-            else:
-                return f"{self.age} years, {self.age_months} months"
-        elif self.age:
-            return f"{self.age} year{'s' if self.age != 1 else ''}"
-        elif self.age_months:
-            return f"{self.age_months} month{'s' if self.age_months != 1 else ''}"
-        
-        return "Age unknown"
+        return f"{self.age_years} year{'s' if self.age_years != 1 else ''}"
     
     def get_personality_list(self):
         """Get personality tags as a list"""
@@ -163,26 +150,11 @@ class Dog(db.Model):
         return True
     
     def get_distance_to(self, other_dog):
-        """Calculate distance to another dog (if both have coordinates)"""
-        if not all([self.latitude, self.longitude, other_dog.latitude, other_dog.longitude]):
-            return None
-        
-        # Simple distance calculation (Haversine formula would be more accurate)
-        import math
-        
-        lat1, lon1 = math.radians(self.latitude), math.radians(self.longitude)
-        lat2, lon2 = math.radians(other_dog.latitude), math.radians(other_dog.longitude)
-        
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        
-        # Earth's radius in kilometers
-        r = 6371
-        
-        return r * c
+        """
+        Calculate distance to another dog based on location strings
+        Returns None - location-based matching removed
+        """
+        return None
     
     def mark_as_adopted(self, adopted_at=None):
         self.is_adopted = True
@@ -200,8 +172,7 @@ class Dog(db.Model):
         data = {
             'id': self.id,
             'name': self.name,
-            'age': self.age,
-            'age_months': self.age_months,
+            'age_years': self.age_years,
             'age_string': self.get_age_string(),
             'breed': self.breed,
             'gender': self.gender,
@@ -348,8 +319,7 @@ class Photo(db.Model):
 class DogCreateSchema(ma.Schema):
     
     name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    age = fields.Int(validate=validate.Range(min=0, max=30))
-    age_months = fields.Int(validate=validate.Range(min=0, max=11))
+    age_years = fields.Int(validate=validate.Range(min=0, max=30))
     breed = fields.Str(validate=validate.Length(max=100))
     gender = fields.Str(required=True, validate=validate.OneOf(['male', 'female']))
     size = fields.Str(required=True, validate=validate.OneOf(['small', 'medium', 'large', 'extra_large']))
@@ -366,8 +336,6 @@ class DogCreateSchema(ma.Schema):
     special_needs = fields.Str()
     description = fields.Str(validate=validate.Length(max=1000))
     location = fields.Str(validate=validate.Length(max=200))
-    latitude = fields.Float(validate=validate.Range(min=-90, max=90))
-    longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     availability_type = fields.Str(validate=validate.OneOf(['playdate', 'adoption', 'both']), missing='playdate')
     adoption_fee = fields.Float(validate=validate.Range(min=0))
     
@@ -383,8 +351,7 @@ class DogCreateSchema(ma.Schema):
 class DogUpdateSchema(ma.Schema):
     
     name = fields.Str(validate=validate.Length(min=1, max=100))
-    age = fields.Int(validate=validate.Range(min=0, max=30))
-    age_months = fields.Int(validate=validate.Range(min=0, max=11))
+    age_years = fields.Int(validate=validate.Range(min=0, max=30))
     breed = fields.Str(validate=validate.Length(max=100))
     size = fields.Str(validate=validate.OneOf(['small', 'medium', 'large', 'extra_large']))
     weight = fields.Float(validate=validate.Range(min=0.1, max=200.0))
@@ -400,8 +367,6 @@ class DogUpdateSchema(ma.Schema):
     special_needs = fields.Str()
     description = fields.Str(validate=validate.Length(max=1000))
     location = fields.Str(validate=validate.Length(max=200))
-    latitude = fields.Float(validate=validate.Range(min=-90, max=90))
-    longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     is_available = fields.Bool()
     availability_type = fields.Str(validate=validate.OneOf(['playdate', 'adoption', 'both']))
     adoption_fee = fields.Float(validate=validate.Range(min=0))
@@ -411,8 +376,7 @@ class DogResponseSchema(ma.Schema):
     
     id = fields.Int()
     name = fields.Str()
-    age = fields.Int()
-    age_months = fields.Int()
+    age_years = fields.Int()
     age_string = fields.Str()
     breed = fields.Str()
     gender = fields.Str()
