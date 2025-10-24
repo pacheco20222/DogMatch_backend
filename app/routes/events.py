@@ -50,10 +50,7 @@ def create_event():
             'duration_hours': data.get('duration_hours'),
             'registration_deadline': registration_deadline,
             'city': data.get('city'),
-            'state': data.get('state'),
             'country': data.get('country'),
-            'latitude': data.get('latitude'),
-            'longitude': data.get('longitude'),
             'venue_details': data.get('venue_details'),
             'max_participants': data.get('max_participants'),
             'price': data.get('price'),
@@ -138,10 +135,6 @@ def get_events():
                 )
             )
 
-        state = filters.get('state')
-        if state:
-            query = query.filter(Event.state.ilike(f"%{state}%"))
-
         country = filters.get('country')
         if country:
             query = query.filter(Event.country.ilike(f"%{country}%"))
@@ -179,12 +172,6 @@ def get_events():
         end_date = filters.get('end_date')
         if end_date:
             query = query.filter(Event.event_date <= end_date)
-
-        user_lat = filters.get('user_latitude')
-        user_lng = filters.get('user_longitude')
-        max_distance = filters.get('max_distance')
-        if user_lat and user_lng and max_distance:
-            pass  # TODO: Implement geospatial filtering when needed
 
         sort_by = request.args.get('sort_by', 'date')
         if sort_by == 'date':

@@ -33,10 +33,7 @@ class Event(db.Model):
     # Location information
     location = db.Column(db.String(300), nullable=False)  # Address or venue name
     city = db.Column(db.String(100), nullable=True)
-    state = db.Column(db.String(100), nullable=True)
     country = db.Column(db.String(100), nullable=True, default='Mexico')
-    latitude = db.Column(db.Float, nullable=True)
-    longitude = db.Column(db.Float, nullable=True)
     venue_details = db.Column(db.Text, nullable=True)  # Parking, accessibility info, etc.
     
     # Capacity and pricing
@@ -46,8 +43,8 @@ class Event(db.Model):
     currency = db.Column(db.String(3), default='MXN', nullable=False)  # Currency code
     
     # Event requirements and restrictions
-    min_age_requirement = db.Column(db.Integer, nullable=True)  # Minimum dog age in months
-    max_age_requirement = db.Column(db.Integer, nullable=True)  # Maximum dog age in months
+    min_age_requirement = db.Column(db.Integer, nullable=True)  # Minimum dog age in years
+    max_age_requirement = db.Column(db.Integer, nullable=True)  # Maximum dog age in years
     size_requirements = db.Column(db.Text, nullable=True)  # JSON array of allowed sizes
     breed_restrictions = db.Column(db.Text, nullable=True)  # JSON array of restricted breeds
     vaccination_required = db.Column(db.Boolean, default=True, nullable=False)
@@ -283,25 +280,10 @@ class Event(db.Model):
         return True, "Dog meets all requirements"
     
     def get_distance_to(self, user_location):
-        """Calculate distance to user's location"""
-        if not all([self.latitude, self.longitude, user_location.get('latitude'), user_location.get('longitude')]):
-            return None
-        
-        import math
-        
-        lat1, lon1 = math.radians(self.latitude), math.radians(self.longitude)
-        lat2, lon2 = math.radians(user_location['latitude']), math.radians(user_location['longitude'])
-        
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        
-        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-        c = 2 * math.asin(math.sqrt(a))
-        
-        # Earth's radius in kilometers
-        r = 6371
-        
-        return r * c
+        """Calculate distance to user's location - deprecated, location-based filtering removed"""
+        # Location-based distance calculation removed
+        # Events are now filtered by city and country only
+        return None
     
     def get_event_image_url(self):
         """Get event image URL or default placeholder"""
@@ -324,7 +306,6 @@ class Event(db.Model):
             'registration_deadline': self.registration_deadline.isoformat() if self.registration_deadline else None,
             'location': self.location,
             'city': self.city,
-            'state': self.state,
             'country': self.country,
             'venue_details': self.venue_details,
             'max_participants': self.max_participants,
@@ -411,10 +392,7 @@ class EventCreateSchema(ma.Schema):
     registration_deadline = fields.DateTime()
     location = fields.Str(required=True, validate=validate.Length(min=3, max=300))
     city = fields.Str(validate=validate.Length(max=100))
-    state = fields.Str(validate=validate.Length(max=100))
     country = fields.Str(validate=validate.Length(max=100), missing='Mexico')
-    latitude = fields.Float(validate=validate.Range(min=-90, max=90))
-    longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     venue_details = fields.Str()
     max_participants = fields.Int(validate=validate.Range(min=1, max=1000))
     price = fields.Float(validate=validate.Range(min=0), missing=0.0)
@@ -468,10 +446,7 @@ class EventUpdateSchema(ma.Schema):
     registration_deadline = fields.DateTime()
     location = fields.Str(validate=validate.Length(min=3, max=300))
     city = fields.Str(validate=validate.Length(max=100))
-    state = fields.Str(validate=validate.Length(max=100))
     country = fields.Str(validate=validate.Length(max=100))
-    latitude = fields.Float(validate=validate.Range(min=-90, max=90))
-    longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     venue_details = fields.Str()
     max_participants = fields.Int(validate=validate.Range(min=1, max=1000))
     price = fields.Float(validate=validate.Range(min=0))
@@ -502,7 +477,6 @@ class EventResponseSchema(ma.Schema):
     registration_deadline = fields.DateTime()
     location = fields.Str()
     city = fields.Str()
-    state = fields.Str()
     country = fields.Str()
     venue_details = fields.Str()
     max_participants = fields.Int()
@@ -558,12 +532,8 @@ class EventListSchema(ma.Schema):
     category = fields.Str(validate=validate.OneOf(['meetup', 'training', 'adoption', 'competition', 'social', 'educational']))
     status = fields.Str(validate=validate.OneOf(['draft', 'published', 'cancelled', 'completed']))
     city = fields.Str()
-    state = fields.Str()
     country = fields.Str()
     upcoming_only = fields.Bool(missing=True)
-    max_distance = fields.Float(validate=validate.Range(min=0, max=1000))  # kilometers
-    user_latitude = fields.Float(validate=validate.Range(min=-90, max=90))
-    user_longitude = fields.Float(validate=validate.Range(min=-180, max=180))
     price_max = fields.Float(validate=validate.Range(min=0))
     free_only = fields.Bool(missing=False)
     organizer_type = fields.Str(validate=validate.OneOf(['shelter', 'admin']))
