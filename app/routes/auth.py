@@ -8,9 +8,11 @@ from marshmallow import ValidationError
 from datetime import datetime, timedelta
 import uuid
 
-from app import db
-from app.models import (
-    User, BlacklistedToken, UserRegistrationSchema, UserLoginSchema, UserResponseSchema, 
+from app import db, limiter
+from app.models.user import User, BlacklistedToken
+from app.utils.sanitizer import sanitize_user_input
+from app.schemas.user_schemas import (
+    UserRegistrationSchema, UserLoginSchema, UserResponseSchema, 
     Setup2FASchema, Verify2FASchema
 )
 
@@ -33,15 +35,20 @@ def root():
     }), 200
 
 @auth_bp.route('/register', methods=['POST'])
+@limiter.limit("3 per hour")
 def register():
     """
     Register a new user
     POST /api/auth/register
+    Rate limit: 3 registrations per hour per IP
     """
     try:
         # Validate input data
         schema = UserRegistrationSchema()
         data = schema.load(request.json)
+        
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_user_input(data)
         
         # Create new user
         user = User(
@@ -75,7 +82,7 @@ def register():
         
     except ValidationError as e:
         return jsonify({
-            'error': 'User could not be verifief',
+            'error': 'User could not be verified',
             'messages': e.messages
         }), 400
     except Exception as e:
@@ -86,10 +93,12 @@ def register():
         }), 500
         
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     """
     Login user with email/password and optional 2FA
     POST /api/auth/login
+    Rate limit: 5 login attempts per minute per IP
     """
     try:
         # Validate input data
@@ -197,6 +206,48 @@ def refresh():
     except Exception as e:
         return jsonify({
             'error': 'Token refresh failed',
+            'message': str(e)
+        }), 500
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    Logout user by blacklisting their current JWT token
+    POST /api/auth/logout
+    """
+    try:
+        # Get JWT data
+        jwt_data = get_jwt()
+        jti = jwt_data['jti']  # JWT ID - unique identifier
+        user_id = int(get_jwt_identity())
+        token_type = jwt_data.get('type', 'access')
+        
+        # Calculate token expiration
+        exp_timestamp = jwt_data['exp']
+        expires_at = datetime.fromtimestamp(exp_timestamp)
+        
+        # Add token to blacklist
+        blacklisted_token = BlacklistedToken(
+            jti=jti,
+            user_id=user_id,
+            token_type=token_type,
+            expires_at=expires_at
+        )
+        db.session.add(blacklisted_token)
+        db.session.commit()
+        
+        current_app.logger.info(f"User {user_id} logged out, token {jti} blacklisted")
+        
+        return jsonify({
+            'message': 'Successfully logged out'
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Logout failed: {str(e)}")
+        return jsonify({
+            'error': 'Logout failed',
             'message': str(e)
         }), 500
         

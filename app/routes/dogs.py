@@ -8,9 +8,10 @@ import uuid
 from werkzeug.utils import secure_filename
 from app import db
 from app.services.s3_service import S3Service
-
-from app.models import(
-    Dog, Photo, User,
+from app.models.dog import Dog, Photo
+from app.models.user import User
+from app.utils.sanitizer import sanitize_dog_input
+from app.schemas.dog_schemas import (
     DogCreateSchema, DogUpdateSchema, DogResponseSchema
 )
 
@@ -39,10 +40,10 @@ def save_uploaded_file(file, dog_id, user_id):
         )
         
         if result['success']:
-            print(f"✅ File uploaded to S3: {result['key']}")
+            current_app.logger.info(f"File uploaded to S3: {result['key']}")
             return result['filename'], result['url'], result['key']
         else:
-            print(f"❌ S3 upload failed: {result.get('error')}")
+            current_app.logger.error(f"S3 upload failed: {result.get('error')}")
             return None, None, None
     
     return None, None, None
@@ -58,12 +59,15 @@ def create_dog():
             return jsonify({"Error":"Invalid User, User has not been found"}), 404
         
         # Log incoming data for debugging
-        print("Incoming request data:", request.json)
+        current_app.logger.debug(f"Incoming request data: {request.json}")
         
         schema = DogCreateSchema()
         data = schema.load(request.json)
         
-        print("Validated data:", data)
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_dog_input(data)
+        
+        current_app.logger.debug(f"Validated data: {data}")
         
         dog = Dog(
             name=data['name'],
@@ -100,15 +104,15 @@ def create_dog():
         }), 201
         
     except ValidationError as e:
-        print("Validation error:", e.messages)
+        current_app.logger.error(f"Validation error: {e.messages}")
         return jsonify({
             "Error":"Validation Error",
             "Message": e.messages
         }), 400
         
     except Exception as e:
-        print("Exception creating dog:", str(e))
-        print("Exception type:", type(e))
+        current_app.logger.error(f"Exception creating dog: {str(e)}")
+        current_app.logger.debug(f"Exception type: {type(e)}")
         import traceback
         traceback.print_exc()
         db.session.rollback()
@@ -219,6 +223,9 @@ def update_dog(dog_id):
         # Validate input data
         schema = DogUpdateSchema()
         data = schema.load(request.json)
+        
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_dog_input(data)
         
         # Update fields
         for field, value in data.items():
@@ -413,10 +420,10 @@ def add_dog_photo(dog_id):
             return jsonify({'error': 'You can only add photos to your own dogs'}), 403
         
         # Debug logging
-        print("Request files:", request.files)
-        print("Request form:", request.form)
-        print("Request content type:", request.content_type)
-        print("Request is_json:", request.is_json)
+        current_app.logger.debug(f"Request files: {request.files}")
+        current_app.logger.debug(f"Request form: {request.form}")
+        current_app.logger.debug(f"Request content type: {request.content_type}")
+        current_app.logger.debug(f"Request is_json: {request.is_json}")
         
         # Handle file upload
         if 'photo' in request.files:

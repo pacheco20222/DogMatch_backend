@@ -3,7 +3,9 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.s3_service import s3_service
 from app import db
-from app.models import User, Dog, Photo, Event
+from app.models.user import User
+from app.models.dog import Dog, Photo
+from app.models.event import Event
 
 s3_bp = Blueprint("s3", __name__)
 

@@ -1,8 +1,6 @@
 # app/models/dog.py
 from datetime import datetime
-from app import db, ma
-from marshmallow import fields, validate, validates, ValidationError
-import re
+from app import db
 
 class Dog(db.Model):
     __tablename__ = "dogs"
@@ -23,9 +21,9 @@ class Dog(db.Model):
     # Personality & Behavior
     personality = db.Column(db.Text, nullable=True)  # JSON array of personality tags
     energy_level = db.Column(db.Enum('low', 'moderate', 'high', 'very_high', name='energy_level_enum'), nullable=True)
-    good_with_kids = db.Column(db.Boolean, nullable=True)
-    good_with_dogs = db.Column(db.Boolean, nullable=True)
-    good_with_cats = db.Column(db.Boolean, nullable=True)
+    good_with_kids = db.Column(db.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True)
+    good_with_dogs = db.Column(db.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True)
+    good_with_cats = db.Column(db.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True)
     
     # Health (Vaccines, special needs)
     is_vaccinated = db.Column(db.Boolean, default=False, nullable=False)
@@ -314,113 +312,3 @@ class Photo(db.Model):
     def __repr__(self):
         """String representation for debugging"""
         return f'<Photo {self.filename} (Dog: {self.dog_id})>'
-
-
-class DogCreateSchema(ma.Schema):
-    
-    name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
-    age_years = fields.Int(validate=validate.Range(min=0, max=30))
-    breed = fields.Str(validate=validate.Length(max=100))
-    gender = fields.Str(required=True, validate=validate.OneOf(['male', 'female']))
-    size = fields.Str(required=True, validate=validate.OneOf(['small', 'medium', 'large', 'extra_large']))
-    weight = fields.Float(validate=validate.Range(min=0.1, max=200.0))
-    color = fields.Str(validate=validate.Length(max=50))
-    personality = fields.List(fields.Str(), missing=[])
-    energy_level = fields.Str(validate=validate.OneOf(['low', 'moderate', 'high', 'very_high']))
-    good_with_kids = fields.Bool()
-    good_with_dogs = fields.Bool()
-    good_with_cats = fields.Bool()
-    is_vaccinated = fields.Bool(missing=False)
-    is_neutered = fields.Bool()
-    health_notes = fields.Str()
-    special_needs = fields.Str()
-    description = fields.Str(validate=validate.Length(max=1000))
-    location = fields.Str(validate=validate.Length(max=200))
-    availability_type = fields.Str(validate=validate.OneOf(['playdate', 'adoption', 'both']), missing='playdate')
-    adoption_fee = fields.Float(validate=validate.Range(min=0))
-    
-    @validates('name')
-    def validate_name(self, value):
-        if not value.strip():
-            raise ValidationError('Name cannot be empty.')
-        
-        if not re.match(r"^[a-zA-Z\s\-']+$", value.strip()):
-            raise ValidationError('Name can only contain letters, spaces, hyphens, and apostrophes.')
-
-
-class DogUpdateSchema(ma.Schema):
-    
-    name = fields.Str(validate=validate.Length(min=1, max=100))
-    age_years = fields.Int(validate=validate.Range(min=0, max=30))
-    breed = fields.Str(validate=validate.Length(max=100))
-    size = fields.Str(validate=validate.OneOf(['small', 'medium', 'large', 'extra_large']))
-    weight = fields.Float(validate=validate.Range(min=0.1, max=200.0))
-    color = fields.Str(validate=validate.Length(max=50))
-    personality = fields.List(fields.Str())
-    energy_level = fields.Str(validate=validate.OneOf(['low', 'moderate', 'high', 'very_high']))
-    good_with_kids = fields.Bool()
-    good_with_dogs = fields.Bool()
-    good_with_cats = fields.Bool()
-    is_vaccinated = fields.Bool()
-    is_neutered = fields.Bool()
-    health_notes = fields.Str()
-    special_needs = fields.Str()
-    description = fields.Str(validate=validate.Length(max=1000))
-    location = fields.Str(validate=validate.Length(max=200))
-    is_available = fields.Bool()
-    availability_type = fields.Str(validate=validate.OneOf(['playdate', 'adoption', 'both']))
-    adoption_fee = fields.Float(validate=validate.Range(min=0))
-
-
-class DogResponseSchema(ma.Schema):
-    
-    id = fields.Int()
-    name = fields.Str()
-    age_years = fields.Int()
-    age_string = fields.Str()
-    breed = fields.Str()
-    gender = fields.Str()
-    size = fields.Str()
-    weight = fields.Float()
-    color = fields.Str()
-    personality = fields.List(fields.Str())
-    energy_level = fields.Str()
-    good_with_kids = fields.Bool()
-    good_with_dogs = fields.Bool()
-    good_with_cats = fields.Bool()
-    is_vaccinated = fields.Bool()
-    is_neutered = fields.Bool()
-    health_notes = fields.Str()
-    special_needs = fields.Str()
-    description = fields.Str()
-    location = fields.Str()
-    is_available = fields.Bool()
-    availability_type = fields.Str()
-    adoption_fee = fields.Float()
-    is_adopted = fields.Bool()
-    adopted_at = fields.DateTime()
-    view_count = fields.Int()
-    like_count = fields.Int()
-    primary_photo_url = fields.Str()
-    photos = fields.List(fields.Dict())
-    owner = fields.Dict()
-    created_at = fields.DateTime()
-    updated_at = fields.DateTime()
-    last_active = fields.DateTime()
-
-
-class PhotoSchema(ma.Schema):
-    """Schema for photo responses"""
-    
-    id = fields.Int()
-    dog_id = fields.Int()
-    url = fields.Str()
-    filename = fields.Str()
-    s3_key = fields.Str()
-    is_primary = fields.Bool()
-    file_size = fields.Int()
-    width = fields.Int()
-    height = fields.Int()
-    content_type = fields.Str()
-    is_s3_photo = fields.Bool()
-    created_at = fields.DateTime()

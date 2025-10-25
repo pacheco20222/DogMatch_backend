@@ -60,7 +60,7 @@ def migration_status():
     """
     try:
         # Check if tables exist by trying to query a simple table
-        from app.models import User
+        from app.models.user import User
         user_count = User.query.count()
         
         return jsonify({

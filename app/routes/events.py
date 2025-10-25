@@ -5,9 +5,15 @@ from marshmallow import ValidationError
 from datetime import datetime, timedelta
 
 from app import db
-from app.models import (
-    Event, EventRegistration, User, Dog,
-    EventCreateSchema, EventUpdateSchema, EventResponseSchema, EventListSchema,
+from app.models.event import Event
+from app.models.event_registration import EventRegistration
+from app.models.user import User
+from app.models.dog import Dog
+from app.utils.sanitizer import sanitize_event_input
+from app.schemas.event_schemas import (
+    EventCreateSchema, EventUpdateSchema, EventResponseSchema, EventListSchema
+)
+from app.schemas.event_registration_schemas import (
     EventRegistrationCreateSchema, EventRegistrationResponseSchema
 )
 
@@ -33,6 +39,9 @@ def create_event():
 
         schema = EventCreateSchema()
         data = schema.load(request.json)
+        
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_event_input(data)
 
         event_date = data['event_date']
         registration_deadline = data.get('registration_deadline')
@@ -282,6 +291,9 @@ def update_event(event_id):
 
         schema = EventUpdateSchema()
         data = schema.load(request.json)
+        
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_event_input(data)
 
         proposed_event_date = data.get('event_date') or event.event_date
         proposed_deadline = data.get('registration_deadline') or event.registration_deadline

@@ -5,8 +5,14 @@ from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_marshmallow import Marshmallow
 from flask_socketio import SocketIO
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import time
 import os
+import logging
 
 # Initialize extensions (but don't bind to app yet)
 db = SQLAlchemy()
@@ -15,6 +21,63 @@ jwt = JWTManager()
 cors = CORS()
 ma = Marshmallow()
 socketio = SocketIO()
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Cache will be initialized in create_app
+cache = None
+
+def setup_query_monitoring(app):
+    """
+    Setup database query performance monitoring.
+    
+    Monitors all database queries and logs slow queries (>100ms) with warnings.
+    This helps identify N+1 query problems and performance bottlenecks.
+    
+    Only enabled when SQLALCHEMY_RECORD_QUERIES is True in config.
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Only enable in development or when explicitly configured
+    if app.config.get('SQLALCHEMY_RECORD_QUERIES', False):
+        
+        @event.listens_for(Engine, "before_cursor_execute")
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            """Record query start time"""
+            conn.info.setdefault('query_start_time', []).append(time.time())
+        
+        @event.listens_for(Engine, "after_cursor_execute")
+        def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            """Calculate query execution time and log slow queries"""
+            try:
+                total = time.time() - conn.info['query_start_time'].pop(-1)
+                
+                # Log slow queries (>100ms)
+                if total > 0.1:
+                    # Clean up the SQL statement for logging
+                    clean_statement = ' '.join(statement.split())
+                    if len(clean_statement) > 200:
+                        clean_statement = clean_statement[:200] + '...'
+                    
+                    logger.warning(
+                        f"Slow query detected ({total:.3f}s): {clean_statement}"
+                    )
+                
+                # Log very slow queries (>1s) as errors
+                if total > 1.0:
+                    logger.error(
+                        f"VERY SLOW QUERY ({total:.3f}s): {statement[:150]}..."
+                    )
+            except (IndexError, KeyError):
+                # Handle edge case where timing info is missing
+                pass
+        
+        app.logger.info("Database query performance monitoring enabled")
+    else:
+        app.logger.info("Database query performance monitoring disabled (set SQLALCHEMY_RECORD_QUERIES=True to enable)")
 
 def create_app(config_name=None):
     """
@@ -36,17 +99,64 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    cors.init_app(app, origins=app.config['CORS_ORIGINS'])
-    ma.init_app(app)
     
-    # Initialize Socket.IO without Redis (Render free tier compatibility)
-    print("🔌 Initializing Socket.IO without Redis for Render compatibility")
-    socketio.init_app(app, 
-                     cors_allowed_origins="*",
-                     async_mode='threading',
-                     logger=True,
-                     engineio_logger=True)
-    print("✅ Socket.IO initialized successfully (no Redis)")
+    # Initialize CORS with comprehensive settings
+    cors.init_app(app, 
+        origins=app.config.get('CORS_ORIGINS', []),
+        supports_credentials=app.config.get('CORS_SUPPORTS_CREDENTIALS', True),
+        allow_headers=app.config.get('CORS_ALLOW_HEADERS', ['Content-Type', 'Authorization']),
+        expose_headers=app.config.get('CORS_EXPOSE_HEADERS', ['Content-Type', 'Authorization']),
+        max_age=app.config.get('CORS_MAX_AGE', 600)
+    )
+    
+    ma.init_app(app)
+    limiter.init_app(app)
+    
+    # Initialize caching
+    global cache
+    from app.utils.cache import init_cache
+    cache = init_cache(app)
+    app.logger.info(f"Cache initialized: {app.config.get('CACHE_TYPE', 'unknown')}")
+    
+    # Setup logging system (must be done before other initializations)
+    from app.utils.logger import setup_logger
+    setup_logger(app)
+    
+    # Setup database query performance monitoring
+    setup_query_monitoring(app)
+    
+    # Register request/response logging middleware
+    from app.middleware import log_request, log_response
+    app.before_request(log_request)
+    app.after_request(log_response)
+    
+    # Initialize Socket.IO with Redis support based on configuration
+    use_redis = app.config.get('SOCKETIO_USE_REDIS', False)
+    redis_url = app.config.get('REDIS_URL')
+    
+    if use_redis and redis_url:
+        # Production mode with Redis for horizontal scaling
+        # Mask password in log output for security
+        safe_redis_url = redis_url.split('@')[0].split(':')[:-1]
+        safe_redis_url = ':'.join(safe_redis_url) + ':***@' + redis_url.split('@')[1] if '@' in redis_url else 'redis://***'
+        
+        app.logger.info(f"Initializing Socket.IO with Redis: {safe_redis_url}")
+        socketio.init_app(app,
+                         message_queue=redis_url,
+                         cors_allowed_origins="*",
+                         async_mode='threading',
+                         logger=True,
+                         engineio_logger=True)
+        app.logger.info("✅ Socket.IO initialized with Redis (supports horizontal scaling)")
+    else:
+        # Development mode without Redis
+        app.logger.info("Initializing Socket.IO without Redis (development mode)")
+        socketio.init_app(app, 
+                         cors_allowed_origins="*",
+                         async_mode='threading',
+                         logger=True,
+                         engineio_logger=True)
+        app.logger.info("✅ Socket.IO initialized without Redis (single server only)")
     
     # Register blueprints (route modules)
     register_blueprints(app)
@@ -62,6 +172,9 @@ def create_app(config_name=None):
 
     # Register health checks
     register_health_routes(app)
+    
+    # Register CLI commands
+    register_cli_commands(app)
     
     # Register static file serving
     register_static_routes(app)
@@ -156,12 +269,11 @@ def register_jwt_handlers(app):
     # Import here to avoid circular imports
     from app.models.user import BlacklistedToken
     
-    #@jwt.token_in_blocklist_loader
-    #def check_if_token_revoked(jwt_header, jwt_payload):
-    #    """Check if JWT token is blacklisted (revoked)"""
-    #    jti = jwt_payload['jti']  # JWT ID - unique identifier for each token
-    #    blacklisted_token = BlacklistedToken.query.filter_by(jti=jti).first()
-    #    return blacklisted_token is not None
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        """Check if JWT token is blacklisted (revoked)"""
+        jti = jwt_payload['jti']  # JWT ID - unique identifier for each token
+        return BlacklistedToken.is_blacklisted(jti)
     
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
@@ -194,6 +306,141 @@ def register_jwt_handlers(app):
             'error': 'Revoked Token',
             'message': 'The JWT token has been revoked'
         }), 401
+
+def register_cli_commands(app):
+    """Register Flask CLI commands"""
+    
+    @app.cli.command("cleanup-blacklist")
+    def cleanup_blacklist():
+        """Remove expired tokens from blacklist"""
+        from app.models.user import BlacklistedToken
+        from datetime import datetime
+        
+        expired_count = BlacklistedToken.query.filter(
+            BlacklistedToken.expires_at < datetime.utcnow()
+        ).delete()
+        db.session.commit()
+        
+        app.logger.info(f"Removed {expired_count} expired tokens from blacklist")
+        print(f"✅ Removed {expired_count} expired tokens from blacklist")
+    
+    @app.cli.command("create-admin")
+    def create_admin():
+        """Create admin user for DogMatch application"""
+        from app.models.user import User
+        
+        print("=" * 60)
+        print("Creating Admin User for DogMatch")
+        print("=" * 60)
+        
+        try:
+            # Check if admin already exists
+            existing_admin = User.query.filter_by(email='admin@dogmatch.com').first()
+            if existing_admin:
+                print("\n⚠️  Admin user already exists!")
+                print(f"   Email: {existing_admin.email}")
+                print(f"   Username: {existing_admin.username}")
+                print(f"   User Type: {existing_admin.user_type}")
+                return
+            
+            # Create admin user
+            print("\n📝 Creating admin user...")
+            admin = User(
+                email='admin@dogmatch.com',
+                password='Admin123!',
+                username='admin',
+                user_type='admin',
+                first_name='Admin',
+                last_name='DogMatch',
+                phone='+1234567890',
+                city='San Francisco',
+                state='California',
+                country='USA',
+                is_active=True,
+                is_verified=True
+            )
+            
+            db.session.add(admin)
+            db.session.commit()
+            
+            print("✅ Admin user created successfully!")
+            print("\n" + "=" * 60)
+            print("Admin User Credentials")
+            print("=" * 60)
+            print(f"Email:    admin@dogmatch.com")
+            print(f"Password: Admin123!")
+            print(f"Username: admin")
+            print(f"Type:     admin")
+            print("=" * 60)
+            print("\n🎉 You can now login with these credentials!")
+            print("   Use this account to create events and manage the app.")
+            
+        except Exception as e:
+            print(f"\n❌ Error creating admin user!")
+            print(f"Error: {str(e)}")
+            db.session.rollback()
+    
+    @app.cli.command("test-db")
+    def test_db():
+        """Test database connection and display table information"""
+        from app.models.user import User, BlacklistedToken
+        from app.models.dog import Dog, Photo
+        from app.models.event import Event
+        from app.models.event_registration import EventRegistration
+        from app.models.match import Match
+        from app.models.message import Message
+        
+        print("=" * 60)
+        print("Testing Database Connection")
+        print("=" * 60)
+        
+        try:
+            # Test database connection
+            print("\n🔌 Testing database connection...")
+            db.engine.connect()
+            print("✅ Database connection successful!")
+            
+            # Get table names
+            print("\n📋 Checking database tables...")
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            print(f"✅ Found {len(tables)} tables:")
+            for table in sorted(tables):
+                print(f"   - {table}")
+            
+            # Verify models can be queried
+            print("\n🔍 Testing model queries...")
+            
+            models_to_test = [
+                ('User', User),
+                ('Dog', Dog),
+                ('Event', Event),
+                ('Match', Match),
+                ('Message', Message),
+                ('EventRegistration', EventRegistration),
+                ('Photo', Photo),
+                ('BlacklistedToken', BlacklistedToken)
+            ]
+            
+            for model_name, model_class in models_to_test:
+                try:
+                    count = model_class.query.count()
+                    print(f"   ✅ {model_name}: {count} records")
+                except Exception as e:
+                    print(f"   ❌ {model_name}: Error - {str(e)}")
+            
+            print("\n" + "=" * 60)
+            print("✅ Database test PASSED")
+            print("=" * 60)
+            print("\n🎉 Your database is ready to use!")
+            
+        except Exception as e:
+            print(f"\n❌ Database test failed!")
+            print(f"Error: {str(e)}")
+            print("\n" + "=" * 60)
+            print("❌ Database test FAILED")
+            print("=" * 60)
 
 def register_health_routes(app):
     """Register health check routes"""
@@ -261,13 +508,13 @@ def register_static_routes(app):
         upload_folder = os.path.abspath(app.config['UPLOAD_FOLDER'])
         file_path = os.path.join(upload_folder, filename)
         
-        print(f"🔍 Static file request: {filename}")
-        print(f"📁 Upload folder: {upload_folder}")
-        print(f"📄 File path: {file_path}")
-        print(f"✅ File exists: {os.path.exists(file_path)}")
+        app.logger.debug(f"Static file request: {filename}")
+        app.logger.debug(f"Upload folder: {upload_folder}")
+        app.logger.debug(f"File path: {file_path}")
+        app.logger.debug(f"File exists: {os.path.exists(file_path)}")
         
         if not os.path.exists(file_path):
-            print(f"❌ File not found: {file_path}")
+            app.logger.warning(f"File not found: {file_path}")
             return "File not found", 404
             
         return send_from_directory(upload_folder, filename)

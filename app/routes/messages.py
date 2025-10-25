@@ -4,9 +4,11 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from datetime import datetime, date
 
-from app import db
-from app.models import (
-    Message, Match, User,
+from app import db, limiter
+from app.models.message import Message
+from app.models.match import Match
+from app.models.user import User
+from app.schemas.message_schemas import (
     MessageCreateSchema, MessageUpdateSchema, MessageResponseSchema, MessageListSchema
 )
 
@@ -15,10 +17,12 @@ messages_bp = Blueprint('messages', __name__)
 
 @messages_bp.route('/matches/<int:match_id>/messages', methods=['POST'])
 @jwt_required()
+@limiter.limit("60 per minute")
 def send_message(match_id):
     """
     Send a message in a match conversation
     POST /api/messages/matches/123/messages
+    Rate limit: 60 messages per minute per IP
     """
     try:
         current_user_id = int(get_jwt_identity())

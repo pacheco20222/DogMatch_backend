@@ -1,12 +1,14 @@
 # /app/routes/matches.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from datetime import datetime
 
-from app import db
-from app.models import (
-    Dog, Match, User,
+from app import db, limiter
+from app.models.dog import Dog
+from app.models.match import Match
+from app.models.user import User
+from app.schemas.match_schemas import (
     SwipeActionSchema, MatchListSchema, MatchResponseSchema
 )
 
@@ -14,6 +16,7 @@ matches_bp = Blueprint("matches", __name__)
 
 @matches_bp.route("/swipe", methods=["POST"])
 @jwt_required()
+@limiter.limit("100 per minute")
 def swipe_on_dog():
     try:
         current_user_id = int(get_jwt_identity())
@@ -57,7 +60,7 @@ def swipe_on_dog():
                 initiated_by_dog_id=user_dog.id,
                 action=action
             )
-            print(f"✅ Created match {match.id}: dog_one={match.dog_one_id} (action={match.dog_one_action}), dog_two={match.dog_two_id} (action={match.dog_two_action}), initiated_by={match.initiated_by_dog_id}")
+            current_app.logger.info(f"Created match {match.id}: dog_one={match.dog_one_id} (action={match.dog_one_action}), dog_two={match.dog_two_id} (action={match.dog_two_action}), initiated_by={match.initiated_by_dog_id}")
         
         # Increment like count if it's a like or super_like
         if action in ['like', 'super_like']:
@@ -244,7 +247,7 @@ def get_pending_matches():
         # Get user's dog IDs
         user_dog_ids = [dog.id for dog in Dog.query.filter(Dog.owner_id == current_user_id).all()]
         
-        print(f"🔍 Pending swipes for user {current_user_id}, dog IDs: {user_dog_ids}")
+        current_app.logger.debug(f"Pending swipes for user {current_user_id}, dog IDs: {user_dog_ids}")
         
         if not user_dog_ids:
             return jsonify({
@@ -262,9 +265,9 @@ def get_pending_matches():
                 Match.dog_one_action == 'pending'
             ).all()
             
-            print(f"  Dog {user_dog_id} as dog_one: {len(matches_as_dog_one)} pending matches")
+            current_app.logger.debug(f"Dog {user_dog_id} as dog_one: {len(matches_as_dog_one)} pending matches")
             for m in matches_as_dog_one:
-                print(f"    Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
+                current_app.logger.debug(f"Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
             
             # Matches where user's dog is dog_two and action is pending
             matches_as_dog_two = Match.query.filter(
@@ -272,9 +275,9 @@ def get_pending_matches():
                 Match.dog_two_action == 'pending'
             ).all()
             
-            print(f"  Dog {user_dog_id} as dog_two: {len(matches_as_dog_two)} pending matches")
+            current_app.logger.debug(f"Dog {user_dog_id} as dog_two: {len(matches_as_dog_two)} pending matches")
             for m in matches_as_dog_two:
-                print(f"    Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
+                current_app.logger.debug(f"Match {m.id}: dog_one={m.dog_one_id} (action={m.dog_one_action}), dog_two={m.dog_two_id} (action={m.dog_two_action})")
             
             pending_matches.extend(matches_as_dog_one)
             pending_matches.extend(matches_as_dog_two)

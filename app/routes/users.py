@@ -5,8 +5,12 @@ from marshmallow import ValidationError
 from datetime import datetime
 
 from app import db
-from app.models import (
-    User, Dog, Match, Message,
+from app.models.user import User
+from app.models.dog import Dog
+from app.models.match import Match
+from app.models.message import Message
+from app.utils.sanitizer import sanitize_user_input
+from app.schemas.user_schemas import (
     UserUpdateSchema, UserResponseSchema
 )
 
@@ -89,6 +93,9 @@ def update_profile():
         # Validate input data
         schema = UserUpdateSchema()
         data = schema.load(request.json)
+        
+        # Sanitize text fields to prevent XSS attacks
+        data = sanitize_user_input(data)
         
         # Update fields
         for field, value in data.items():
