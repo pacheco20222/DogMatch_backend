@@ -352,9 +352,9 @@ def delete_event(event_id):
         if not event:
             return jsonify({'error': 'Event not found'}), 404
         
-        # Check if user can delete this event (organizer or admin)
-        if event.organizer_id != current_user_id and not user.is_admin():
-            return jsonify({'error': 'You can only delete your own events'}), 403
+        # Only admins can delete/cancel events
+        if not user.is_admin():
+            return jsonify({'error': 'Admin privileges required to cancel events'}), 403
         
         # Soft delete - mark as cancelled instead of hard delete
         event.status = 'cancelled'
