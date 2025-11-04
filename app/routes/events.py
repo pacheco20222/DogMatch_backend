@@ -408,7 +408,11 @@ def register_for_event(event_id):
         ).first()
         
         if existing_registration:
-            return jsonify({'error': 'You are already registered for this event'}), 400
+            # Make registration idempotent for clients: return the existing registration
+            return jsonify({
+                'message': 'You are already registered for this event',
+                'registration': existing_registration.to_dict(include_event=False, include_user=True)
+            }), 200
         
         # Check if user has a cancelled registration that we can reactivate
         cancelled_registration = EventRegistration.query.filter(
@@ -544,7 +548,8 @@ def unregister_from_event(event_id):
         db.session.commit()
         
         return jsonify({
-            'message': 'Successfully unregistered from event'
+            'message': 'Successfully unregistered from event',
+            'registration': registration.to_dict(include_event=False, include_user=True)
         }), 200
         
     except Exception as e:
