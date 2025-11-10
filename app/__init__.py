@@ -110,6 +110,15 @@ def create_app(config_name=None):
     )
     
     ma.init_app(app)
+    
+    # Initialize rate limiter - DISABLE in debug mode for development
+    # Rate limiting is important for production to prevent abuse, but annoying during development
+    if app.config.get('DEBUG', False) or app.config.get('FLASK_DEBUG', False):
+        app.logger.info("Rate limiting DISABLED (Debug mode enabled)")
+        limiter.enabled = False
+    else:
+        app.logger.info("Rate limiting ENABLED (Production mode)")
+    
     limiter.init_app(app)
     
     # Initialize caching

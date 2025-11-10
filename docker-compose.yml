@@ -31,17 +31,22 @@ services:
     # Restart policy: always restart if container crashes
     restart: unless-stopped
     
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
     # Environment variables for MySQL
+    # Using your .env credentials to avoid confusion!
     environment:
-      # Root password (for admin access)
-      MYSQL_ROOT_PASSWORD: rootpassword123
+      # Root password (using your DB_PASSWORD from .env)
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       
-      # Create a database on startup
-      MYSQL_DATABASE: dogmatch
+      # Create a database on startup (using your DB_NAME from .env)
+      MYSQL_DATABASE: ${DB_NAME}
       
-      # Create a user with access to the database
-      MYSQL_USER: dogmatch_user
-      MYSQL_PASSWORD: dogmatch_pass
+      # Create a user with access to the database (using your DB_USER from .env)
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
       
       # Character set (important for emoji support!)
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
@@ -64,7 +69,8 @@ services:
     # Health check to know when MySQL is ready
     healthcheck:
       # Try to login and run a simple query
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword123"]
+      # Note: Using root user with password from .env
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${DB_PASSWORD}"]
       interval: 10s      # Check every 10 seconds
       timeout: 5s        # Fail if command takes > 5 seconds
       retries: 5         # Try 5 times before marking unhealthy
@@ -84,8 +90,9 @@ services:
     container_name: dogmatch_redis
     restart: unless-stopped
     
-    # Command to run Redis with password
-    command: redis-server --requirepass redis_password123
+    # Command to run Redis WITHOUT password for local development
+    # (Your production Render Redis has a password in REDIS_URL from .env)
+    command: redis-server
     
     # Persistent storage for Redis data
     volumes:
@@ -118,38 +125,29 @@ services:
     container_name: dogmatch_backend
     restart: unless-stopped
     
-    # Environment variables for Flask app
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    
+    # Override specific vars for local Docker environment
     environment:
-      # Flask configuration
-      FLASK_ENV: development
-      FLASK_DEBUG: "True"
-      FLASK_APP: run.py
+      # Flask configuration (keep from .env)
+      # FLASK_ENV, FLASK_DEBUG already in .env
       
-      # Database connection
+      # Database connection - OVERRIDE to use local MySQL container
       # Format: mysql+pymysql://user:password@host:port/database
-      DATABASE_URL: mysql+pymysql://dogmatch_user:dogmatch_pass@mysql:3306/dogmatch
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/${DB_NAME}
       
-      # Individual DB vars (fallback)
+      # Individual DB vars - OVERRIDE host to use Docker network
       DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: dogmatch_user
-      DB_PASSWORD: dogmatch_pass
-      DB_NAME: dogmatch
+      # DB_PORT, DB_USER, DB_PASSWORD, DB_NAME come from .env
       
-      # Redis connection
-      REDIS_URL: redis://:redis_password123@redis:6379/0
+      # Redis connection - OVERRIDE to use local Redis container (no password)
+      REDIS_URL: redis://redis:6379/0
       SOCKETIO_USE_REDIS: "true"
       CACHE_TYPE: redis
       
-      # JWT secrets (use strong random strings in production!)
-      SECRET_KEY: dev-secret-key-change-in-production
-      JWT_SECRET_KEY: dev-jwt-secret-change-in-production
-      
-      # AWS S3 (use your actual credentials from .env)
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      # JWT secrets, AWS credentials, etc. all come from .env
       
       # CORS (allow frontend access)
       CORS_ORIGINS: http://localhost:3000,http://localhost:19006,http://127.0.0.1:3000
@@ -176,7 +174,7 @@ services:
     
     # Expose Flask port to host
     ports:
-      - "5000:5000"
+      - "5002:5002"
     
     # Wait for these services to be healthy before starting
     depends_on:

@@ -55,15 +55,15 @@ RUN mkdir -p /app/logs /app/app/static/dog_photos && \
 
 USER appuser
 
-EXPOSE 5000
+EXPOSE 5002
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -f http://localhost:5002/health || exit 1
 
 ENTRYPOINT [ "/app/docker/entrypoint.sh" ]
 
 CMD ["gunicorn", \
-     "--bind", "0.0.0.0:5000", \
+     "--bind", "0.0.0.0:5002", \
      "--workers", "2", \
      "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", \
      "--timeout", "120", \

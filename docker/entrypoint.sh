@@ -63,13 +63,28 @@ wait_for_database() {
         DB_NAME=${DB_NAME:-dogmatch}
     fi
     
-    # Try to connect to MySQL (max 30 attempts = 60 seconds)
-    MAX_ATTEMPTS=30
+    # Try to connect to MySQL (max 40 attempts = 120 seconds)
+    # MySQL needs extra time on first startup to create database and users
+    MAX_ATTEMPTS=40
     ATTEMPT=0
     
     while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         # Try to connect using Python (works on systems without mysql client)
-        python3 << EOF
+        # TEMPORARY: Show error on first few attempts for debugging
+        if [ $ATTEMPT -eq 0 ]; then
+            log_info "DEBUG: Trying to connect to MySQL with:"
+            log_info "  Host: $DB_HOST"
+            log_info "  Port: $DB_PORT"
+            log_info "  User: $DB_USER"
+            log_info "  Database: $DB_NAME"
+            log_info "  Password: ${DB_PASSWORD:0:3}... (hidden)"
+        fi
+        
+        ATTEMPT=$((ATTEMPT + 1))
+        
+        # Try connection and show errors on first 3 attempts
+        if [ $ATTEMPT -le 3 ]; then
+            python3 -c "
 import sys
 try:
     import pymysql
@@ -82,19 +97,40 @@ try:
         connect_timeout=5
     )
     connection.close()
-    sys.exit(0)
+    print('SUCCESS')
 except Exception as e:
+    print(f'ERROR: {e}')
     sys.exit(1)
-EOF
-        
-        if [ $? -eq 0 ]; then
-            log_success "Database is ready!"
-            return 0
+"
+            if [ $? -eq 0 ]; then
+                log_success "Database is ready!"
+                return 0
+            fi
+        else
+            # Silent attempts after first 3
+            if python3 -c "
+import sys
+try:
+    import pymysql
+    connection = pymysql.connect(
+        host='$DB_HOST',
+        port=int('$DB_PORT'),
+        user='$DB_USER',
+        password='$DB_PASSWORD',
+        database='$DB_NAME',
+        connect_timeout=5
+    )
+    connection.close()
+except:
+    sys.exit(1)
+" 2>/dev/null; then
+                log_success "Database is ready!"
+                return 0
+            fi
         fi
         
-        ATTEMPT=$((ATTEMPT + 1))
-        log_warning "Database not ready yet (attempt $ATTEMPT/$MAX_ATTEMPTS). Retrying in 2 seconds..."
-        sleep 2
+        log_warning "Database not ready yet (attempt $ATTEMPT/$MAX_ATTEMPTS). Retrying in 3 seconds..."
+        sleep 3
     done
     
     log_error "Database failed to become ready after $MAX_ATTEMPTS attempts"
@@ -126,7 +162,7 @@ wait_for_redis() {
     
     while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         # Try to connect to Redis
-        python3 << EOF
+        if python3 -c "
 import sys
 try:
     import redis
@@ -134,10 +170,9 @@ try:
     r.ping()
     sys.exit(0)
 except Exception as e:
+    print(f'Redis error: {e}', file=sys.stderr)
     sys.exit(1)
-EOF
-        
-        if [ $? -eq 0 ]; then
+" 2>/dev/null; then
             log_success "Redis is ready!"
             return 0
         fi
