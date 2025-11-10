@@ -156,7 +156,7 @@ def create_app(config_name=None):
                          async_mode='threading',
                          logger=True,
                          engineio_logger=True)
-        app.logger.info("✅ Socket.IO initialized with Redis (supports horizontal scaling)")
+        app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
     else:
         # Development mode without Redis
         app.logger.info("Initializing Socket.IO without Redis (development mode)")
@@ -165,7 +165,7 @@ def create_app(config_name=None):
                          async_mode='threading',
                          logger=True,
                          engineio_logger=True)
-        app.logger.info("✅ Socket.IO initialized without Redis (single server only)")
+        app.logger.info("Socket.IO initialized without Redis (single server only)")
     
     # Register blueprints (route modules)
     register_blueprints(app)
@@ -218,6 +218,7 @@ def register_blueprints(app):
     from app.routes.events import events_bp
     from app.routes.migrate import migrate_bp
     from app.routes.s3 import s3_bp
+    from app.routes.ai_assistant import ai_bp
     
     # Register with URL prefixes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -228,6 +229,7 @@ def register_blueprints(app):
     app.register_blueprint(events_bp, url_prefix='/api/events')
     app.register_blueprint(migrate_bp, url_prefix='/api/migrate')
     app.register_blueprint(s3_bp, url_prefix='/api/s3')
+    app.register_blueprint(ai_bp, url_prefix='/api/ai')
     
 def register_socket_events(app):
     """Register Socket.IO event handlers"""

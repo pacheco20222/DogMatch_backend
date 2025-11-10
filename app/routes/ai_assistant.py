@@ -5,7 +5,7 @@ import logging
 ai_bp = Blueprint('ai_assistant', __name__)
 logger = logging.getLogger(__name__)
 
-@ai_bp.route('/ask', method=['POST'])
+@ai_bp.route('/ask', methods=['POST'])
 @jwt_required()
 def ask_assistant():
     """
@@ -35,23 +35,23 @@ def ask_assistant():
         # Validate
         if not question:
             return jsonify({
-                'error' : 'Yoou need to specify a question',
-                'message' : 'Please provide Felix with a question'
+                'error': 'Question required',
+                'message': 'Please provide a question for the AI assistant'
             }), 400
             
         if len(question) > 500:
             return jsonify({
-                'error' : 'Question is to long',
-                'Message' : 'To provide you with the best answer keep your question under 500 characters'
+                'error': 'Question too long',
+                'message': 'Please keep questions under 500 characters'
             }), 400
-            
-        logger.info(f"AI assistant request from user: {current_user_id}: {question[:50]}...")
-        
+
+        logger.info(f"AI assistant request from user {current_user_id}: {question[:50]}...")
+
         from app.services.gemini_service import ask_gemini
-        
+
         response = ask_gemini(question, context_type)
-        logger.info(f"AI assitant generated a response: {len(response)} characters")
-        
+        logger.info(f"AI assistant generated a response: {len(response)} characters")
+
         return jsonify({
             'answer' : response,
             'tokens_used' : len(question.split()) + len(response.split()),
@@ -65,7 +65,7 @@ def ask_assistant():
             'message' : 'Failed to generate a response. Please try again.'
         }), 500
         
-@ai_bp.route('/quick_actions', methods=['GET'])
+@ai_bp.route('/quick-actions', methods=['GET'])
 @jwt_required()
 def get_quick_actions():
     """
