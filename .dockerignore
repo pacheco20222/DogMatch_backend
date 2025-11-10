@@ -1,0 +1,57 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables (NEVER include in Docker image)
+.env
+.env.local
+.env.*.local
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+logs/
+*.log
+
+# Database files (if you have any local SQLite)
+*.db
+*.sqlite
+*.sqlite3
+
+# Documentation (don't need in image)
+*.md
+docs/
+
+# CI/CD files (GitHub Actions doesn't run in container)
+.github/
+
+# Docker files (no need to copy these into the image itself)
+Dockerfile*
+docker-compose*.yml
+.dockerignore

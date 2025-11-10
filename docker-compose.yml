@@ -1,0 +1,252 @@
+# ============================================================================
+# Docker Compose Configuration for DogMatch Backend
+# ============================================================================
+# Purpose: Define and run multi-container application for local development
+# 
+# Usage:
+#   Start all services:     docker-compose up
+#   Start in background:    docker-compose up -d
+#   Stop all services:      docker-compose down
+#   View logs:              docker-compose logs -f backend
+#   Rebuild:                docker-compose up --build
+# ============================================================================
+
+version: '3.8'  # Docker Compose file format version
+
+# ============================================================================
+# SERVICES (Containers)
+# ============================================================================
+services:
+  
+  # --------------------------------------------------------------------------
+  # MySQL Database
+  # --------------------------------------------------------------------------
+  mysql:
+    # Use official MySQL 8.0 image
+    image: mysql:8.0
+    
+    # Container name (easier to reference)
+    container_name: dogmatch_mysql
+    
+    # Restart policy: always restart if container crashes
+    restart: unless-stopped
+    
+    # Environment variables for MySQL
+    environment:
+      # Root password (for admin access)
+      MYSQL_ROOT_PASSWORD: rootpassword123
+      
+      # Create a database on startup
+      MYSQL_DATABASE: dogmatch
+      
+      # Create a user with access to the database
+      MYSQL_USER: dogmatch_user
+      MYSQL_PASSWORD: dogmatch_pass
+      
+      # Character set (important for emoji support!)
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    
+    # Persistent storage for database data
+    # Without this, all data is lost when container stops!
+    volumes:
+      # Mount named volume 'mysql_data' to MySQL's data directory
+      - mysql_data:/var/lib/mysql
+      
+      # Optional: Custom MySQL configuration
+      # - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf
+    
+    # Expose port 3306 (MySQL default) to host machine
+    # Format: "host_port:container_port"
+    ports:
+      - "3306:3306"
+    
+    # Health check to know when MySQL is ready
+    healthcheck:
+      # Try to login and run a simple query
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword123"]
+      interval: 10s      # Check every 10 seconds
+      timeout: 5s        # Fail if command takes > 5 seconds
+      retries: 5         # Try 5 times before marking unhealthy
+      start_period: 30s  # Wait 30 seconds before first check (MySQL startup time)
+    
+    # Connect to custom network
+    networks:
+      - dogmatch-network
+
+  # --------------------------------------------------------------------------
+  # Redis (Caching + Socket.IO Message Queue)
+  # --------------------------------------------------------------------------
+  redis:
+    # Use official Redis 7 Alpine (small, 40MB)
+    image: redis:7-alpine
+    
+    container_name: dogmatch_redis
+    restart: unless-stopped
+    
+    # Command to run Redis with password
+    command: redis-server --requirepass redis_password123
+    
+    # Persistent storage for Redis data
+    volumes:
+      - redis_data:/data
+    
+    # Expose Redis port
+    ports:
+      - "6379:6379"
+    
+    # Health check for Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    
+    networks:
+      - dogmatch-network
+
+  # --------------------------------------------------------------------------
+  # Backend (Flask Application)
+  # --------------------------------------------------------------------------
+  backend:
+    # Build from Dockerfile in current directory
+    build:
+      context: .           # Build context (where Dockerfile is)
+      dockerfile: Dockerfile
+    
+    container_name: dogmatch_backend
+    restart: unless-stopped
+    
+    # Environment variables for Flask app
+    environment:
+      # Flask configuration
+      FLASK_ENV: development
+      FLASK_DEBUG: "True"
+      FLASK_APP: run.py
+      
+      # Database connection
+      # Format: mysql+pymysql://user:password@host:port/database
+      DATABASE_URL: mysql+pymysql://dogmatch_user:dogmatch_pass@mysql:3306/dogmatch
+      
+      # Individual DB vars (fallback)
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: dogmatch_user
+      DB_PASSWORD: dogmatch_pass
+      DB_NAME: dogmatch
+      
+      # Redis connection
+      REDIS_URL: redis://:redis_password123@redis:6379/0
+      SOCKETIO_USE_REDIS: "true"
+      CACHE_TYPE: redis
+      
+      # JWT secrets (use strong random strings in production!)
+      SECRET_KEY: dev-secret-key-change-in-production
+      JWT_SECRET_KEY: dev-jwt-secret-change-in-production
+      
+      # AWS S3 (use your actual credentials from .env)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      
+      # CORS (allow frontend access)
+      CORS_ORIGINS: http://localhost:3000,http://localhost:19006,http://127.0.0.1:3000
+      
+      # Performance tuning for development
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 2
+      
+      # Create admin on startup
+      CREATE_ADMIN: "true"
+    
+    # Volumes for development (hot reload!)
+    volumes:
+      # Mount your local code into the container
+      # Changes to code are immediately reflected without rebuild!
+      - ./app:/app/app:ro         # :ro = read-only (container can't modify your code)
+      - ./migrations:/app/migrations
+      
+      # Persistent storage for uploaded files
+      - uploads:/app/app/static/dog_photos
+      
+      # Persistent storage for logs
+      - logs:/app/logs
+    
+    # Expose Flask port to host
+    ports:
+      - "5000:5000"
+    
+    # Wait for these services to be healthy before starting
+    depends_on:
+      mysql:
+        condition: service_healthy  # Wait for MySQL healthcheck to pass
+      redis:
+        condition: service_healthy  # Wait for Redis healthcheck to pass
+    
+    networks:
+      - dogmatch-network
+    
+    # For development with Flask dev server (hot reload):
+    # Uncomment the line below and comment out the Gunicorn CMD in Dockerfile
+    # command: ["python", "run.py"]
+    
+    # For production with Gunicorn (what we're using):
+    # The CMD from Dockerfile will be used automatically via entrypoint.sh
+
+  # --------------------------------------------------------------------------
+  # Adminer (Database Management UI) - Optional but useful!
+  # --------------------------------------------------------------------------
+  adminer:
+    # Lightweight database management interface
+    image: adminer:latest
+    
+    container_name: dogmatch_adminer
+    restart: unless-stopped
+    
+    # Expose Adminer web interface
+    ports:
+      - "8080:8080"
+    
+    # Only start if you want to manage the database
+    # Can be disabled by running: docker-compose up backend
+    depends_on:
+      - mysql
+    
+    networks:
+      - dogmatch-network
+    
+    # Adminer design (optional - makes it look nicer)
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+      ADMINER_DESIGN: dracula
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+# Create a custom network so containers can communicate by name
+networks:
+  dogmatch-network:
+    driver: bridge  # Standard Docker network driver
+
+# ============================================================================
+# VOLUMES (Persistent Storage)
+# ============================================================================
+# Named volumes for data that should survive container restarts
+volumes:
+  # MySQL database files
+  mysql_data:
+    driver: local
+  
+  # Redis data files
+  redis_data:
+    driver: local
+  
+  # Uploaded dog photos
+  uploads:
+    driver: local
+  
+  # Application logs
+  logs:
+    driver: local
