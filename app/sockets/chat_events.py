@@ -53,8 +53,8 @@ def handle_connect():
     active_users[user.id].append(request.sid)
     user_rooms[request.sid] = []
     
-    logger.info(f"User {user.id} ({user.email}) connected with socket {request.sid}")
-    logger.info(f"📱 Active users: {list(active_users.keys())}")
+    logger.info(f"🔵 CONNECT: User {user.id} ({user.email}) connected with socket {request.sid}")
+    logger.info(f"📱 ACTIVE_USERS after connect: {dict(active_users)}")
     
     # Emit connection confirmation
     emit('connected', {
@@ -127,7 +127,8 @@ def handle_join_match(data):
         user_rooms[request.sid] = []
     user_rooms[request.sid].append(room_name)
     
-    logger.info(f"User {user.id} joined match room {room_name}")
+    logger.info(f"🟢 JOIN_MATCH: User {user.id} (socket {request.sid}) joined room {room_name}")
+    logger.info(f"📍 USER_ROOMS after join: {dict(user_rooms)}")
     
     emit('joined_match', {
         'match_id': match_id,

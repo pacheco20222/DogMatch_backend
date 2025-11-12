@@ -5,6 +5,8 @@ from marshmallow import ValidationError
 from datetime import datetime, date
 
 from app import db, limiter
+from app import socketio
+from app.sockets.chat_events import active_users
 from app.models.message import Message
 from app.models.match import Match
 from app.models.user import User
@@ -64,6 +66,59 @@ def send_message(match_id):
         
         # Update match message stats
         match.update_message_stats()
+
+        # Prepare socket payloads and emit real-time events (best-effort)
+        try:
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Sender perspective (is_sent_by_me=True)
+            sender_message_data = message.to_dict(current_user_id=current_user_id)
+
+            # Recipient perspective
+            recipient_message_data = message.to_dict(current_user_id=None)
+            recipient_message_data['is_sent_by_me'] = False
+
+            room_name = f"match_{match_id}"
+            
+            logger.info(f"🔵 REST EMIT: About to emit to room {room_name}")
+            logger.info(f"📱 ACTIVE_USERS at emit time: {dict(active_users)}")
+
+            # Emit to room (other clients in the match)
+            socketio.emit('new_message', sender_message_data, room=room_name)
+            logger.info(f"✅ REST EMIT: Emitted sender_message_data to room {room_name}")
+            
+            socketio.emit('new_message', recipient_message_data, room=room_name, include_self=False)
+            logger.info(f"✅ REST EMIT: Emitted recipient_message_data to room {room_name} (exclude_self)")
+
+            # Also notify the other user directly if online
+            # Determine other user id
+            other_user_id = None
+            from app.models.dog import Dog
+            other_dog = None
+            user_dog_ids = [dog.id for dog in User.query.get(current_user_id).dogs]
+            if match.dog_one_id in user_dog_ids:
+                other_dog = Dog.query.get(match.dog_two_id)
+            else:
+                other_dog = Dog.query.get(match.dog_one_id)
+
+            if other_dog:
+                other_user_id = other_dog.owner_id
+
+            logger.info(f"🔍 REST EMIT: Other user ID = {other_user_id}")
+            
+            if other_user_id and other_user_id in active_users:
+                logger.info(f"✅ REST EMIT: Other user {other_user_id} is online with sockets: {active_users[other_user_id]}")
+                for socket_id in active_users[other_user_id]:
+                    socketio.emit('new_message', recipient_message_data, room=socket_id)
+                    logger.info(f"✅ REST EMIT: Sent to socket {socket_id}")
+            else:
+                logger.info(f"❌ REST EMIT: Other user {other_user_id} NOT in active_users")
+        except Exception as e:
+            # Socket emission failure should not break the API response
+            import logging
+            logging.getLogger(__name__).error(f"❌ REST EMIT ERROR: {str(e)}")
+            pass
         
         return jsonify({
             'message': 'Message sent successfully',

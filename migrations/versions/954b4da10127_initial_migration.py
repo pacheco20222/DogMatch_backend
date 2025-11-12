@@ -1,8 +1,8 @@
-"""Initial migration with all tables
+"""initial_migration
 
-Revision ID: 8f8b7d456872
+Revision ID: 954b4da10127
 Revises: 
-Create Date: 2025-10-21 17:08:52.411397
+Create Date: 2025-11-11 06:36:05.161984
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '8f8b7d456872'
+revision = '954b4da10127'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -66,8 +66,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('age', sa.Integer(), nullable=True),
-    sa.Column('age_months', sa.Integer(), nullable=True),
+    sa.Column('age_years', sa.Integer(), nullable=True),
     sa.Column('breed', sa.String(length=100), nullable=True),
     sa.Column('gender', sa.Enum('male', 'female', name='dog_gender_enum'), nullable=False),
     sa.Column('size', sa.Enum('small', 'medium', 'large', 'extra_large', name='dog_size_enum'), nullable=False),
@@ -75,17 +74,15 @@ def upgrade():
     sa.Column('color', sa.String(length=50), nullable=True),
     sa.Column('personality', sa.Text(), nullable=True),
     sa.Column('energy_level', sa.Enum('low', 'moderate', 'high', 'very_high', name='energy_level_enum'), nullable=True),
-    sa.Column('good_with_kids', sa.Boolean(), nullable=True),
-    sa.Column('good_with_dogs', sa.Boolean(), nullable=True),
-    sa.Column('good_with_cats', sa.Boolean(), nullable=True),
+    sa.Column('good_with_kids', sa.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True),
+    sa.Column('good_with_dogs', sa.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True),
+    sa.Column('good_with_cats', sa.Enum('yes', 'no', 'not_sure', name='compatibility_enum'), nullable=True),
     sa.Column('is_vaccinated', sa.Boolean(), nullable=False),
     sa.Column('is_neutered', sa.Boolean(), nullable=True),
     sa.Column('health_notes', sa.Text(), nullable=True),
     sa.Column('special_needs', sa.Text(), nullable=True),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('location', sa.String(length=200), nullable=True),
-    sa.Column('latitude', sa.Float(), nullable=True),
-    sa.Column('longitude', sa.Float(), nullable=True),
     sa.Column('is_available', sa.Boolean(), nullable=False),
     sa.Column('availability_type', sa.Enum('playdate', 'adoption', 'both', name='availability_type_enum'), nullable=False),
     sa.Column('adoption_fee', sa.Float(), nullable=True),
@@ -110,10 +107,7 @@ def upgrade():
     sa.Column('registration_deadline', sa.DateTime(), nullable=True),
     sa.Column('location', sa.String(length=300), nullable=False),
     sa.Column('city', sa.String(length=100), nullable=True),
-    sa.Column('state', sa.String(length=100), nullable=True),
     sa.Column('country', sa.String(length=100), nullable=True),
-    sa.Column('latitude', sa.Float(), nullable=True),
-    sa.Column('longitude', sa.Float(), nullable=True),
     sa.Column('venue_details', sa.Text(), nullable=True),
     sa.Column('max_participants', sa.Integer(), nullable=True),
     sa.Column('current_participants', sa.Integer(), nullable=False),
