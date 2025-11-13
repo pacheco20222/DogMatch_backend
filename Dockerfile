@@ -50,7 +50,8 @@ COPY --from=builder /app/venv /app/venv
 
 COPY --chown=appuser:appuser . .
 
-RUN mkdir -p /app/logs /app/app/static/dog_photos && \
+# Create logs directory only (photos are stored in S3, not locally)
+RUN mkdir -p /app/logs && \
     chown -R appuser:appuser /app
 
 USER appuser

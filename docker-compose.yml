@@ -167,11 +167,10 @@ services:
       - ./app:/app/app:ro         # :ro = read-only (container can't modify your code)
       - ./migrations:/app/migrations
       
-      # Persistent storage for uploaded files
-      - uploads:/app/app/static/dog_photos
-      
       # Persistent storage for logs
       - logs:/app/logs
+      
+      # Note: No volume for dog_photos - all photos stored in S3!
     
     # Expose Flask port to host
     ports:
@@ -234,18 +233,17 @@ networks:
 # ============================================================================
 # Named volumes for data that should survive container restarts
 volumes:
-  # MySQL database files
+  # MySQL database files - ESSENTIAL (contains all user/dog/match data)
   mysql_data:
     driver: local
   
-  # Redis data files
+  # Redis data files - caching and Socket.IO message queue
   redis_data:
     driver: local
   
-  # Uploaded dog photos
-  uploads:
-    driver: local
-  
-  # Application logs
+  # Application logs - debugging and monitoring
   logs:
     driver: local
+  
+  # Note: No volume for photos - all photos are stored in AWS S3!
+  # Database only contains S3 URLs, not actual image files

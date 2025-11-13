@@ -177,15 +177,8 @@ def create_app(config_name=None):
     # Initialize S3 service
     initialize_s3_service(app)
 
-    # Create upload folders if they don't exist
-    upload_folder = app.config['UPLOAD_FOLDER']
-    if not os.path.exists(upload_folder):
-        os.makedirs(upload_folder, exist_ok=True)
-    
-    # Also create static folder structure
-    static_folder = os.path.join('app', 'static')
-    if not os.path.exists(static_folder):
-        os.makedirs(static_folder, exist_ok=True)
+    # Note: No need to create local upload folders - all photos stored in S3!
+    # The UPLOAD_FOLDER config exists for backward compatibility but isn't used
     
     return app
 
