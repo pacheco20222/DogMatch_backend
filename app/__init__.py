@@ -2,7 +2,6 @@ from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
-from flask_cors import CORS
 from flask_marshmallow import Marshmallow
 from flask_socketio import SocketIO
 from flask_limiter import Limiter
@@ -18,7 +17,6 @@ import logging
 db = SQLAlchemy()
 migrate = Migrate()
 jwt = JWTManager()
-cors = CORS()
 ma = Marshmallow()
 socketio = SocketIO()
 limiter = Limiter(
@@ -99,16 +97,6 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
-    
-    # Initialize CORS with comprehensive settings
-    cors.init_app(app, 
-        origins=app.config.get('CORS_ORIGINS', []),
-        supports_credentials=app.config.get('CORS_SUPPORTS_CREDENTIALS', True),
-        allow_headers=app.config.get('CORS_ALLOW_HEADERS', ['Content-Type', 'Authorization']),
-        expose_headers=app.config.get('CORS_EXPOSE_HEADERS', ['Content-Type', 'Authorization']),
-        max_age=app.config.get('CORS_MAX_AGE', 600)
-    )
-    
     ma.init_app(app)
     
     # Initialize rate limiter - DISABLE in debug mode for development
@@ -152,7 +140,6 @@ def create_app(config_name=None):
         app.logger.info(f"Initializing Socket.IO with Redis: {safe_redis_url}")
         socketio.init_app(app,
                          message_queue=redis_url,
-                         cors_allowed_origins="*",
                          async_mode='threading',
                          logger=True,
                          engineio_logger=True)
@@ -161,7 +148,6 @@ def create_app(config_name=None):
         # Development mode without Redis
         app.logger.info("Initializing Socket.IO without Redis (development mode)")
         socketio.init_app(app, 
-                         cors_allowed_origins="*",
                          async_mode='threading',
                          logger=True,
                          engineio_logger=True)

@@ -42,13 +42,6 @@ class Config:
     UPLOAD_FOLDER = os.path.join('app', 'static', 'dog_photos')
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     
-    # CORS Configuration
-    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "").split(',')
-    CORS_SUPPORTS_CREDENTIALS = True
-    CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']
-    CORS_EXPOSE_HEADERS = ['Content-Type', 'Authorization']
-    CORS_MAX_AGE = 600  # Cache preflight requests for 10 minutes
-    
     # Cache Configuration
     CACHE_TYPE = os.environ.get("CACHE_TYPE", "SimpleCache")  # SimpleCache, redis, or FileSystemCache
     CACHE_DEFAULT_TIMEOUT = int(os.environ.get("CACHE_DEFAULT_TIMEOUT", 300))  # 5 minutes default
@@ -63,9 +56,6 @@ class DevelopmentConfig(Config):
     DEBUG = True
     TESTING = False
     SQLALCHEMY_ECHO = True # Send queries to cli
-    
-    # Development CORS - allow localhost
-    CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:19006"]
     
     # Development Cache - use SimpleCache (in-memory, no Redis needed)
     CACHE_TYPE = "SimpleCache"
@@ -87,18 +77,6 @@ class ProductionConfig(Config):
     
     # Production Socket.IO - use Redis for horizontal scaling
     SOCKETIO_USE_REDIS = True
-    
-    # Production CORS - must be set via environment variable
-    # Override parent class default
-    def __init__(self):
-        super().__init__()
-        cors_origins = os.environ.get("CORS_ORIGINS", "")
-        if not cors_origins or cors_origins.strip() == "":
-            raise ValueError(
-                "CORS_ORIGINS environment variable must be set in production! "
-                "Example: CORS_ORIGINS='https://yourdomain.com,https://www.yourdomain.com'"
-            )
-        self.CORS_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
     
 class TestingConfig(Config):
     """Testing environment configuration"""
