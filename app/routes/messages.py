@@ -84,15 +84,7 @@ def send_message(match_id):
             logger.info(f"🔵 REST EMIT: About to emit to room {room_name}")
             logger.info(f"📱 ACTIVE_USERS at emit time: {dict(active_users)}")
 
-            # Emit to room (other clients in the match)
-            socketio.emit('new_message', sender_message_data, room=room_name)
-            logger.info(f"✅ REST EMIT: Emitted sender_message_data to room {room_name}")
-            
-            socketio.emit('new_message', recipient_message_data, room=room_name, include_self=False)
-            logger.info(f"✅ REST EMIT: Emitted recipient_message_data to room {room_name} (exclude_self)")
-
-            # Also notify the other user directly if online
-            # Determine other user id
+            # Determine the other participant for targeted payloads
             other_user_id = None
             from app.models.dog import Dog
             other_dog = None
@@ -105,12 +97,41 @@ def send_message(match_id):
             if other_dog:
                 other_user_id = other_dog.owner_id
 
-            logger.info(f"🔍 REST EMIT: Other user ID = {other_user_id}")
+            logger.info(f"✅ REST EMIT: Other user ID = {other_user_id}")
+
+            # Emit sender perspective directly to active sockets owned by the current user
+            sender_socket_ids = active_users.get(current_user_id, [])
+            logger.info(f"🔵 REST EMIT: Sender sockets {sender_socket_ids}")
+            for socket_id in sender_socket_ids:
+                socketio.emit(
+                    'new_message',
+                    sender_message_data,
+                    room=socket_id,
+                    namespace='/'
+                )
+                logger.info(f"✅ REST EMIT: Sent sender_message_data to socket {socket_id}")
             
+            # Emit recipient perspective to the match room, skipping sender sockets so they do not receive the wrong payload
+            skip_sids = sender_socket_ids if sender_socket_ids else None
+            socketio.emit(
+                'new_message',
+                recipient_message_data,
+                room=room_name,
+                skip_sid=skip_sids,
+                namespace='/'
+            )
+            logger.info(f"✅ REST EMIT: Emitted recipient_message_data to room {room_name} (skip {skip_sids})")
+
+            # Notify the other participant directly if they're online
             if other_user_id and other_user_id in active_users:
                 logger.info(f"✅ REST EMIT: Other user {other_user_id} is online with sockets: {active_users[other_user_id]}")
                 for socket_id in active_users[other_user_id]:
-                    socketio.emit('new_message', recipient_message_data, room=socket_id)
+                    socketio.emit(
+                        'new_message',
+                        recipient_message_data,
+                        room=socket_id,
+                        namespace='/'
+                    )
                     logger.info(f"✅ REST EMIT: Sent to socket {socket_id}")
             else:
                 logger.info(f"❌ REST EMIT: Other user {other_user_id} NOT in active_users")

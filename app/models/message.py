@@ -193,6 +193,7 @@ class Message(db.Model):
         data = {
             'id': self.id,
             'match_id': self.match_id,
+            'sender_user_id': self.sender_user_id,
             'content': self.get_display_content(),
             'raw_content': self.content if not self.is_deleted else None,
             'message_type': self.message_type,

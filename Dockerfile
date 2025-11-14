@@ -50,6 +50,9 @@ COPY --from=builder /app/venv /app/venv
 
 COPY --chown=appuser:appuser . .
 
+RUN sed -i 's/\r$//' docker/entrypoint.sh && \
+    chmod +x docker/entrypoint.sh
+
 # Create logs directory only (photos are stored in S3, not locally)
 RUN mkdir -p /app/logs && \
     chown -R appuser:appuser /app

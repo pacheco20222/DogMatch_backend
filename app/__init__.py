@@ -131,6 +131,10 @@ def create_app(config_name=None):
     use_redis = app.config.get('SOCKETIO_USE_REDIS', False)
     redis_url = app.config.get('REDIS_URL')
     
+    cors_allowed = app.config.get('SOCKETIO_CORS_ALLOWED_ORIGINS', "*")
+
+    async_mode = app.config.get('SOCKETIO_ASYNC_MODE', 'gevent')
+
     if use_redis and redis_url:
         # Production mode with Redis for horizontal scaling
         # Mask password in log output for security
@@ -140,7 +144,8 @@ def create_app(config_name=None):
         app.logger.info(f"Initializing Socket.IO with Redis: {safe_redis_url}")
         socketio.init_app(app,
                          message_queue=redis_url,
-                         async_mode='threading',
+                         async_mode=async_mode,
+                         cors_allowed_origins=cors_allowed,
                          logger=True,
                          engineio_logger=True)
         app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
@@ -148,7 +153,8 @@ def create_app(config_name=None):
         # Development mode without Redis
         app.logger.info("Initializing Socket.IO without Redis (development mode)")
         socketio.init_app(app, 
-                         async_mode='threading',
+                         async_mode=async_mode,
+                         cors_allowed_origins=cors_allowed,
                          logger=True,
                          engineio_logger=True)
         app.logger.info("Socket.IO initialized without Redis (single server only)")

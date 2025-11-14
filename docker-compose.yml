@@ -149,9 +149,6 @@ services:
       
       # JWT secrets, AWS credentials, etc. all come from .env
       
-      # CORS (allow frontend access from local dev origins)
-      # Includes: localhost, 127.0.0.1, your Mac LAN IP, and Expo dev ports
-      CORS_ORIGINS: "http://localhost:3000,http://localhost:19006,http://localhost:8081,http://127.0.0.1:3000,http://127.0.0.1:19006,http://127.0.0.1:8081,http://192.168.1.80:3000,http://192.168.1.80:19006,http://192.168.1.80:8081"
       
       # Performance tuning for development
       GUNICORN_WORKERS: 2
