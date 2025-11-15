@@ -75,6 +75,7 @@ class Verify2FASchema(ma.Schema):
 class UserUpdateSchema(ma.Schema):
     """Schema for user profile updates"""
     
+    username = fields.Str(validate=validate.Length(min=3, max=50), allow_none=True)
     first_name = fields.Str(validate=validate.Length(max=50), allow_none=True)
     last_name = fields.Str(validate=validate.Length(max=50), allow_none=True)
     phone = fields.Str(validate=validate.Length(max=20), allow_none=True)
@@ -89,6 +90,20 @@ class UserUpdateSchema(ma.Schema):
         """Basic phone validation"""
         if value and not re.match(r'^[\+\d\s\-\(\)]+$', value):
             raise ValidationError('Invalid phone number format.')
+
+    @validates('username')
+    def validate_username(self, value):
+        """Ensure username format and uniqueness"""
+        if not value:
+            return
+        if not re.match(r'^[a-zA-Z0-9_-]+$', value):
+            raise ValidationError('Username can only contain letters, numbers, underscores, and hyphens.')
+
+        from app.models.user import User
+        existing = User.query.filter_by(username=value).first()
+        current_user_id = self.context.get('user_id')
+        if existing and existing.id != current_user_id:
+            raise ValidationError('Username already taken.')
 
 
 class UserResponseSchema(ma.Schema):

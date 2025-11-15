@@ -70,15 +70,14 @@ class S3Service:
                 Body=file_data,
                 ContentType=content_type
                 # Note: ACL removed as modern S3 buckets often have ACLs disabled
-                # Photos will be accessible via the public URL if bucket policy allows
+                # Photos will be accessed via signed URLs generated on-demand
             )
             
-            # Generate public URL
-            s3_url = f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{s3_key}"
-            
+            # Return S3 key - signed URLs will be generated when needed
+            # This prevents storing expired URLs in the database
             return {
                 'success': True,
-                'url': s3_url,
+                'url': s3_key,  # Store key, not URL
                 'key': s3_key,
                 'filename': unique_filename,
                 'content_type': content_type

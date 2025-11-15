@@ -255,14 +255,20 @@ def logout():
 @jwt_required()
 def get_current_user():
     try:
+        from flask import current_app
         current_user_id = int(get_jwt_identity())  # Convert string back to int
         user = User.query.get(current_user_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
+        current_app.logger.info(f"📸 /api/auth/me - user.profile_photo_url from DB: {user.profile_photo_url}")
+        
+        user_dict = user.to_dict(include_sensitive=True, include_2fa_status=True)
+        current_app.logger.info(f"📸 /api/auth/me - returning profile_photo_url: {user_dict.get('profile_photo_url')}")
+        
         return jsonify({
-            'user': user.to_dict(include_sensitive=True, include_2fa_status=True)
+            'user': user_dict
         }), 200
         
     except Exception as e:

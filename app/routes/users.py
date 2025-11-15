@@ -1,5 +1,5 @@
 # /app/routes/users.py
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import ValidationError
 from datetime import datetime
@@ -91,26 +91,45 @@ def update_profile():
             return jsonify({'error': 'User not found'}), 404
         
         # Validate input data
-        schema = UserUpdateSchema()
+        schema = UserUpdateSchema(context={'user_id': current_user_id})
         data = schema.load(request.json)
+        
+        current_app.logger.info(f"📸 Received profile update data: {data}")
         
         # Sanitize text fields to prevent XSS attacks
         data = sanitize_user_input(data)
+        
+        current_app.logger.info(f"📸 After sanitization: {data}")
         
         # Update fields
         for field, value in data.items():
             if hasattr(user, field):
                 setattr(user, field, value)
+                current_app.logger.info(f"📸 Setting {field} = {value}")
         
         # Update timestamp
         user.updated_at = datetime.utcnow()
         
+        current_app.logger.info(f"📸 Before commit - user.profile_photo_url: {user.profile_photo_url}")
+        
+        # Mark as dirty and flush to ensure changes are tracked
+        db.session.add(user)
+        db.session.flush()
+        
         # Save changes
         db.session.commit()
         
+        # Refresh the user object to ensure we have the latest data
+        db.session.refresh(user)
+        
+        current_app.logger.info(f"📸 After commit - user.profile_photo_url: {user.profile_photo_url}")
+        
+        user_dict = user.to_dict(include_sensitive=True)
+        current_app.logger.info(f"📸 Returning user dict with profile_photo_url: {user_dict.get('profile_photo_url')}")
+        
         return jsonify({
             'message': 'Profile updated successfully',
-            'user': user.to_dict(include_sensitive=True)
+            'user': user_dict
         }), 200
         
     except ValidationError as e:

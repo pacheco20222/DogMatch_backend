@@ -318,6 +318,22 @@ class User(db.Model):
                 return dt_obj.isoformat()
             return str(dt_obj)
         
+        # Generate signed URL for profile photo if S3 key exists
+        profile_photo_url = None
+        if self.profile_photo_url:
+            # Check if it's an S3 key (starts with user-photos/) or already a URL
+            if self.profile_photo_url.startswith('user-photos/'):
+                # It's an S3 key - generate signed URL
+                from app.services.s3_service import s3_service
+                profile_photo_url = s3_service.get_photo_url(
+                    self.profile_photo_url, 
+                    signed=True, 
+                    expiration=604800  # 7 days
+                )
+            else:
+                # It's already a URL (legacy data or external URL)
+                profile_photo_url = self.profile_photo_url
+        
         data = {
             'id': self.id,
             'username': self.username,
@@ -328,7 +344,7 @@ class User(db.Model):
             'city': self.city,
             'state': self.state,
             'country': self.country,
-            'profile_photo_url': self.get_profile_photo_url(),
+            'profile_photo_url': profile_photo_url,  # Fresh signed URL
             'is_active': self.is_active,
             'is_verified': self.is_verified,
             'created_at': safe_isoformat(self.created_at),
