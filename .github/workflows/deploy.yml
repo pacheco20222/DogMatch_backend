@@ -12,7 +12,7 @@ permissions:
 env:
   AZURE_RESOURCE_GROUP: dogmatch-app
   AZURE_CONTAINERAPPS_ENVIRONMENT: dogmatch-env
-  AZURE_CONTAINER_REGISTRY_LOGIN_SERVER: dogmatchacr.azurecr.io
+  AZURE_CONTAINER_REGISTRY_LOGIN_SERVER: dogmtachcr.azurecr.io
   CONTAINER_APP_NAME: dogmatch-backend
 
 jobs:
