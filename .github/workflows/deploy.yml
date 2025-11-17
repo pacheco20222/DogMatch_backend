@@ -50,6 +50,8 @@ jobs:
           --name $CONTAINER_APP_NAME \
           --resource-group $AZURE_RESOURCE_GROUP \
           --image $IMAGE_TAG \
+          --ingress external \
+          --target-port 5002 \
           --set-env-vars \
             FLASK_ENV=production \
             DATABASE_URL='${{ secrets.DATABASE_URL }}' \
@@ -62,4 +64,4 @@ jobs:
             S3_BUCKET_NAME='${{ secrets.S3_BUCKET_NAME }}' \
             GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
             JWT_ACCESS_TOKEN_EXPIRES='${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}' \
-            JWT_REFRESH_TOKEN_EXPIRES='${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}' \
+            JWT_REFRESH_TOKEN_EXPIRES='${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}'
