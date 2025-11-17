@@ -61,7 +61,8 @@ def register():
             phone=data.get('phone'),
             city=data.get('city'),
             state=data.get('state'),
-            country=data.get('country', 'Mexico')
+            country=data.get('country', 'Mexico'),
+            profile_photo_url=data.get('profile_photo_url')
         )
         
         # Save to database

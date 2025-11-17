@@ -22,6 +22,7 @@ class UserRegistrationSchema(ma.Schema):
     city = fields.Str(validate=validate.Length(max=100))
     state = fields.Str(validate=validate.Length(max=100))
     country = fields.Str(validate=validate.Length(max=100), missing='Mexico')
+    profile_photo_url = fields.Str(validate=validate.Length(max=500), allow_none=True)
     
     @validates('email')
     def validate_email(self, value):

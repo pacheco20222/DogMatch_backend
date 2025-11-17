@@ -91,6 +91,52 @@ def upload_user_profile_photo():
             'message': str(e)
         }), 500
 
+@s3_bp.route('/upload/user-profile-public', methods=['POST'])
+def upload_user_profile_photo_public():
+    """
+    Upload user profile photo to S3 during registration (no auth required)
+    POST /api/s3/upload/user-profile-public
+    Returns the S3 key (not full URL) to be stored in the database
+    """
+    try:
+        # Check if file is provided
+        if 'photo' not in request.files:
+            return jsonify({'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Read file data
+        file_data = file.read()
+        
+        # Upload to S3 with a temporary user_id (will use timestamp-based key)
+        import time
+        temp_user_id = int(time.time() * 1000)  # Use timestamp as temporary ID
+        
+        result = s3_service.upload_photo(
+            file_data=file_data,
+            file_type='user_profile',
+            user_id=temp_user_id
+        )
+        
+        if not result['success']:
+            return jsonify({'error': result['error']}), 500
+        
+        # Return the S3 key (not full URL) so it can be stored in the database
+        # The backend will generate signed URLs when needed
+        return jsonify({
+            'message': 'Profile photo uploaded successfully',
+            'photo_url': result['url']  # This is the S3 key
+        }), 200
+            
+    except Exception as e:
+        current_app.logger.error(f"Public profile photo upload error: {e}")
+        return jsonify({
+            'error': 'Upload failed',
+            'message': str(e)
+        }), 500
+
 @s3_bp.route('/upload/dog-photo', methods=['POST'])
 @jwt_required()
 def upload_dog_photo():
