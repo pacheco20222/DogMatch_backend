@@ -32,7 +32,7 @@ jobs:
 
     - name: Azure CLI - Log in to ACR
       run: |
-        az acr login --name dogmatchacr
+        az acr login --name dogmtachcr
 
     - name: Build Docker image
       run: |
