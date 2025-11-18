@@ -48,7 +48,11 @@ for attempt in range(15):
             password=password,
             database=db,
             connect_timeout=4,
-            ssl={}   # <<<<< IMPORTANT FIX — ENABLE TLS
+            ssl={
+                "ca": "/etc/ssl/certs/ca-certificates.crt",
+                "check_hostname" : False,
+                "verify_mode": 0
+            }   # <<<<< IMPORTANT FIX — ENABLE TLS
         )
         conn.close()
         print("[SUCCESS] Database is ready!")
