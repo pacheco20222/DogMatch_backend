@@ -54,7 +54,10 @@ jobs:
           --set properties.configuration.ingress.external=true \
           --set properties.configuration.ingress.targetPort=5002 \
           --set properties.configuration.ingress.allowInsecure=true \
-          --set properties.configuration.ingress.transport=auto \
+          --set properties.configuration.ingress.transport=http \
+          --set properties.configuration.ingress.clientCertificateMode=ignore \
+          --set properties.template.scale.minReplicas=1 \
+          --set properties.template.scale.maxReplicas=1 \
           --set-env-vars \
             FLASK_ENV=production \
             DATABASE_URL=${{ secrets.DATABASE_URL }} \
