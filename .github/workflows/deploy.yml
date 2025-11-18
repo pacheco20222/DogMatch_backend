@@ -53,6 +53,8 @@ jobs:
           --image $IMAGE_TAG \
           --set properties.configuration.ingress.external=true \
           --set properties.configuration.ingress.targetPort=5002 \
+          --set properties.configuration.ingress.allowInsecure=false \
+          --set properties.configuration.ingress.transport=auto \
           --set-env-vars \
             FLASK_ENV=production \
             DATABASE_URL=${{ secrets.DATABASE_URL }} \
