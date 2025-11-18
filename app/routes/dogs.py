@@ -15,6 +15,7 @@ from app.schemas.dog_schemas import (
     DogCreateSchema, DogUpdateSchema, DogResponseSchema
 )
 
+# Define Blueprint
 dogs_bp = Blueprint("dogs", __name__)
 
 def allowed_file(filename):
