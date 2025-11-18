@@ -204,6 +204,7 @@ def register_blueprints(app):
     from app.routes.migrate import migrate_bp
     from app.routes.s3 import s3_bp
     from app.routes.ai_assistant import ai_bp
+    from app.routes.health import health_bp
     
     # Register with URL prefixes
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -215,6 +216,7 @@ def register_blueprints(app):
     app.register_blueprint(migrate_bp, url_prefix='/api/migrate')
     app.register_blueprint(s3_bp, url_prefix='/api/s3')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(health_bp, url_prefix='/api')
     
 def register_socket_events(app):
     """Register Socket.IO event handlers"""

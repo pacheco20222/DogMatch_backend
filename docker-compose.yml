@@ -179,6 +179,14 @@ services:
       redis:
         condition: service_healthy  # Wait for Redis healthcheck to pass
     
+    # Add health check for backend service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
     networks:
       - dogmatch-network
     
