@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
-#AI agent
+
+# AI agent Using gemini 
 ai_bp = Blueprint('ai_assistant', __name__)
 logger = logging.getLogger(__name__)
 
