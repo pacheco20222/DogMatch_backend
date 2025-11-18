@@ -46,6 +46,7 @@ jobs:
 
     - name: Deploy to Azure Container Apps
       run: |
+        # First, update the image and basic configuration
         az containerapp update \
           --name $CONTAINER_APP_NAME \
           --resource-group $AZURE_RESOURCE_GROUP \
@@ -64,4 +65,36 @@ jobs:
             S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
             JWT_ACCESS_TOKEN_EXPIRES="${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}" \
-            JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}" 
+            JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}"
+        
+        # Configure probes - using individual --set commands for reliability
+        az containerapp update \
+          --name $CONTAINER_APP_NAME \
+          --resource-group $AZURE_RESOURCE_GROUP \
+          --set properties.template.containers[0].probes[0].type=Startup \
+          --set properties.template.containers[0].probes[0].httpGet.path=/api/health/live \
+          --set properties.template.containers[0].probes[0].httpGet.port=5002 \
+          --set properties.template.containers[0].probes[0].httpGet.scheme=HTTP \
+          --set properties.template.containers[0].probes[0].initialDelaySeconds=10 \
+          --set properties.template.containers[0].probes[0].periodSeconds=5 \
+          --set properties.template.containers[0].probes[0].timeoutSeconds=3 \
+          --set properties.template.containers[0].probes[0].failureThreshold=30 \
+          --set properties.template.containers[0].probes[0].successThreshold=1 \
+          --set properties.template.containers[0].probes[1].type=Liveness \
+          --set properties.template.containers[0].probes[1].httpGet.path=/api/health/live \
+          --set properties.template.containers[0].probes[1].httpGet.port=5002 \
+          --set properties.template.containers[0].probes[1].httpGet.scheme=HTTP \
+          --set properties.template.containers[0].probes[1].initialDelaySeconds=30 \
+          --set properties.template.containers[0].probes[1].periodSeconds=10 \
+          --set properties.template.containers[0].probes[1].timeoutSeconds=5 \
+          --set properties.template.containers[0].probes[1].failureThreshold=3 \
+          --set properties.template.containers[0].probes[1].successThreshold=1 \
+          --set properties.template.containers[0].probes[2].type=Readiness \
+          --set properties.template.containers[0].probes[2].httpGet.path=/api/health/ready \
+          --set properties.template.containers[0].probes[2].httpGet.port=5002 \
+          --set properties.template.containers[0].probes[2].httpGet.scheme=HTTP \
+          --set properties.template.containers[0].probes[2].initialDelaySeconds=10 \
+          --set properties.template.containers[0].probes[2].periodSeconds=5 \
+          --set properties.template.containers[0].probes[2].timeoutSeconds=3 \
+          --set properties.template.containers[0].probes[2].failureThreshold=3 \
+          --set properties.template.containers[0].probes[2].successThreshold=1 

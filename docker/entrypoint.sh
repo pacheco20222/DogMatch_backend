@@ -107,8 +107,21 @@ log_info "Environment: ${FLASK_ENV:-unset}"
 log_info "Python version: $(python --version)"
 
 log_info "Checking dependencies..."
+# Temporarily disable exit on error for dependency checks
+# Don't fail the container if database/redis aren't ready - let the app handle retries
+set +e
 wait_for_database
+DB_STATUS=$?
+if [ $DB_STATUS -ne 0 ]; then
+    log_warning "Database check failed, but continuing startup..."
+fi
+
 wait_for_redis
+REDIS_STATUS=$?
+if [ $REDIS_STATUS -ne 0 ]; then
+    log_warning "Redis check failed, but continuing startup..."
+fi
+set -e
 
 log_success "Dependencies OK! Starting Gunicorn..."
 
