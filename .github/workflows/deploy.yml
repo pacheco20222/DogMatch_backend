@@ -77,6 +77,10 @@ jobs:
             JWT_ACCESS_TOKEN_EXPIRES="${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}" \
             JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}"
         
+        # Wait a moment for the update to propagate
+        echo "Waiting for environment variables to update..."
+        sleep 5
+        
         # Get current container app configuration and update probes using Python
         python3 << EOF
         import json
@@ -150,9 +154,25 @@ jobs:
         ]
         
         # Update probes in the existing container config
-        # Get the existing container to preserve all settings
+        # Get the existing container to preserve all settings INCLUDING env vars
         existing_container = config['properties']['template']['containers'][0].copy()
+        
+        # Log current env vars for debugging
+        print("Current environment variables:")
+        for env_var in existing_container.get('env', []):
+            name = env_var.get('name', 'unknown')
+            # Don't print sensitive values
+            if 'SECRET' in name or 'PASSWORD' in name or 'KEY' in name:
+                print(f"  {name}: [REDACTED]")
+            else:
+                print(f"  {name}: {env_var.get('value', '')[:50]}")
+        
+        # Add probes to container
         existing_container['probes'] = probes
+        
+        # IMPORTANT: The env vars were set by az containerapp update above
+        # The existing_container already has the updated env vars from the update command
+        # We preserve them by copying the entire container config
         
         # For PATCH, send the template with updated probes
         # This preserves all other container settings (env vars, resources, etc.)
@@ -181,6 +201,26 @@ jobs:
           --headers "Content-Type=application/json" \
           --body @/tmp/containerapp-updated.json
         
+        # Explicitly update environment variables again to ensure they're set correctly
+        # This is a safeguard in case the PATCH overwrote them
+        echo "Updating environment variables to ensure they're correct..."
+        az containerapp update \
+          --name $CONTAINER_APP_NAME \
+          --resource-group $AZURE_RESOURCE_GROUP \
+          --set-env-vars \
+            FLASK_ENV=production \
+            DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            REDIS_URL=${{ secrets.REDIS_URL }} \
+            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            JWT_SECRET_KEY="${{ secrets.JWT_SECRET_KEY }}" \
+            AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            AWS_DEFAULT_REGION="${{ secrets.AWS_DEFAULT_REGION }}" \
+            S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
+            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            JWT_ACCESS_TOKEN_EXPIRES="${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}" \
+            JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}"
+        
         # Wait for deployment to complete and verify status
         echo "Waiting for container app to be ready..."
         sleep 10
@@ -198,10 +238,10 @@ jobs:
         for i in {1..6}; do
           echo "Attempt $i/6..."
           if curl -f -s "https://${APP_URL}/api/health/live" > /dev/null; then
-            echo "✅ Health check passed!"
+            echo "Health check passed!"
             break
           else
-            echo "⏳ Health check failed, waiting 10 seconds..."
+            echo "Health check failed, waiting 10 seconds..."
             sleep 10
           fi
         done 
