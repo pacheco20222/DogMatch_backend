@@ -191,11 +191,11 @@ services:
       - dogmatch-network
     
     # For development with Flask dev server (hot reload):
-    # Uncomment the line below and comment out the Gunicorn CMD in Dockerfile
     # command: ["python", "run.py"]
     
-    # For production with Gunicorn (what we're using):
-    # The CMD from Dockerfile will be used automatically via entrypoint.sh
+    # For production-like testing with Gunicorn:
+    # Uses wsgi.py which handles gevent monkey patching
+    # The CMD from Dockerfile will be used automatically
 
   # --------------------------------------------------------------------------
   # Adminer (Database Management UI) - Optional but useful!

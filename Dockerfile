@@ -48,7 +48,8 @@ WORKDIR /app
 
 COPY --from=builder /app/venv /app/venv
 
-COPY --chown=appuser:appuser . .
+# Copy application code
+COPY . .
 
 RUN sed -i 's/\r$//' /app/docker/entrypoint.sh && \
     chmod +x /app/docker/entrypoint.sh
@@ -59,6 +60,7 @@ RUN mkdir -p /app/logs && \
 
 USER appuser
 
+# Expose port
 EXPOSE 5002
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
@@ -66,11 +68,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT [ "/app/docker/entrypoint.sh" ]
 
-CMD ["gunicorn", \
-     "--bind", "0.0.0.0:5002", \
-     "--workers", "2", \
-     "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", \
-     "--timeout", "120", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "run:app"]
+# Use wsgi.py as entry point instead of run.py
+CMD ["gunicorn", "--worker-class", "geventwebsocket.gunicorn.workers.GeventWebSocketWorker", "--workers", "1", "--bind", "0.0.0.0:5002", "--timeout", "120", "--log-level", "info", "wsgi:app"]

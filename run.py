@@ -1,20 +1,27 @@
-﻿import os 
+﻿"""
+Local Development Server Entry Point
+For production, use wsgi.py instead
+"""
+
+# Monkey patch for gevent compatibility
+from gevent import monkey
+monkey.patch_all()
+
 from app import create_app, socketio
+import os
 
 app = create_app()
 
-if __name__ == "__main__":
-    debug_mode = os.environ.get("FLASK_DEBUG", "True").lower() == "true"
-    port = int(os.environ.get("PORT", 5000))
-    host = os.environ.get('HOST', '0.0.0.0')
+if __name__ == '__main__':
+    port = int(os.getenv('PORT', 5002))
+    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
-    print("Backend is starting")
-    print(f"The backend is running on http://{host}:{port}")
-
+    # Run with socketio
     socketio.run(
         app,
-        host=host,
+        host='0.0.0.0',
         port=port,
-        debug=debug_mode,
-        allow_unsafe_werkzeug=True
+        debug=debug,
+        use_reloader=debug,
+        log_output=True
     )
