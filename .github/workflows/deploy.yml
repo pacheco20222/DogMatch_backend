@@ -30,9 +30,9 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Azure CLI - Log in to ACR
-      run: |
-        az acr login --name dogmtachcr
+#    - name: Azure CLI - Log in to ACR
+#      run: |
+#        az acr login --name dogmtachcr
 
     - name: Build Docker image
       run: |
