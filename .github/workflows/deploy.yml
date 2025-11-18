@@ -47,15 +47,20 @@ jobs:
     - name: Deploy to Azure Container Apps
       run: |
         # First, update the image and basic configuration
+        # IMPORTANT: Update ingress configuration FIRST, then image
+        az containerapp ingress enable \
+          --name $CONTAINER_APP_NAME \
+          --resource-group $AZURE_RESOURCE_GROUP \
+          --type external \
+          --target-port 5002 \
+          --transport http \
+          --allow-insecure
+        
+        # Then update the image and other settings
         az containerapp update \
           --name $CONTAINER_APP_NAME \
           --resource-group $AZURE_RESOURCE_GROUP \
           --image $IMAGE_TAG \
-          --set properties.configuration.ingress.external=true \
-          --set properties.configuration.ingress.targetPort=5002 \
-          --set properties.configuration.ingress.allowInsecure=true \
-          --set properties.configuration.ingress.transport=http \
-          --set properties.configuration.ingress.clientCertificateMode=ignore \
           --set properties.template.scale.minReplicas=1 \
           --set properties.template.scale.maxReplicas=1 \
           --set-env-vars \
