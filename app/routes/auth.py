@@ -16,6 +16,8 @@ from app.schemas.user_schemas import (
     Setup2FASchema, Verify2FASchema
 )
 
+
+#And define the Blueprint
 auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route('/', methods=['GET'])
