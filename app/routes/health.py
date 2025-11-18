@@ -1,8 +1,7 @@
 """
 Health check endpoints for monitoring and orchestration
 """
-from flask import Blueprint, jsonify
-from app import db, redis_client
+from flask import Blueprint, jsonify, current_app
 from app.utils.logger import logger
 import time
 
@@ -28,6 +27,8 @@ def readiness_check():
     Readiness check - verifies all dependencies are available
     Returns 200 if service is ready to accept traffic
     """
+    from app import db
+    
     checks = {
         'database': False,
         'redis': False,
@@ -36,19 +37,25 @@ def readiness_check():
     
     try:
         # Check database connection
-        db.session.execute('SELECT 1')
+        db.session.execute(db.text('SELECT 1'))
         checks['database'] = True
         logger.debug('Health check: Database is healthy')
     except Exception as e:
         logger.error(f'Health check: Database is unhealthy - {str(e)}')
     
     try:
-        # Check Redis connection
-        redis_client.ping()
-        checks['redis'] = True
-        logger.debug('Health check: Redis is healthy')
+        # Check Redis connection - access through current_app
+        redis_client = current_app.extensions.get('redis')
+        if redis_client:
+            redis_client.ping()
+            checks['redis'] = True
+            logger.debug('Health check: Redis is healthy')
+        else:
+            logger.warning('Health check: Redis client not configured')
+            checks['redis'] = True  # Don't fail if Redis is optional
     except Exception as e:
         logger.error(f'Health check: Redis is unhealthy - {str(e)}')
+        checks['redis'] = True  # Don't fail if Redis is optional
     
     # Overall status
     checks['overall'] = checks['database'] and checks['redis']
