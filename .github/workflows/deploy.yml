@@ -64,5 +64,4 @@ jobs:
             S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
             JWT_ACCESS_TOKEN_EXPIRES="${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}" \
-            JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}" \
-            --replace-env-vars
+            JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}" 
