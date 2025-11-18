@@ -20,12 +20,18 @@ from app.schemas.user_schemas import (
 #And define the Blueprint
 auth_bp = Blueprint("auth", __name__)
 
-@auth_bp.route('/', methods=['GET'])
+@auth_bp.route('/', methods=['GET', 'POST', 'OPTIONS'])
 def root():
+    """Root endpoint - also accepts POST/OPTIONS for testing"""
+    if request.method == 'OPTIONS':
+        # Handle CORS preflight
+        return '', 200
+    
     return jsonify({
         'message': 'DogMatch API is running',
         'version': '1.0.0',
         'status': 'healthy',
+        'method': request.method,
         'endpoints': {
             'auth': '/api/auth',
             'users': '/api/users',

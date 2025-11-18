@@ -129,14 +129,30 @@ def create_app(config_name=None):
     CORS(app, 
          origins=cors_origins,
          supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'])
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+         max_age=3600)  # Cache preflight for 1 hour
     app.logger.info(f"CORS enabled with origins: {cors_origins}")
     
     # Register request/response logging middleware
     from app.middleware import log_request, log_response
     app.before_request(log_request)
     app.after_request(log_response)
+    
+    # Add additional detailed logging for POST requests to debug Azure issues
+    @app.before_request
+    def log_post_requests():
+        """Log detailed info for POST requests to debug Azure Container Apps issues"""
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            app.logger.info(f"📥 POST REQUEST DETECTED: {request.method} {request.path}")
+            app.logger.info(f"   Remote: {request.remote_addr}")
+            app.logger.info(f"   Content-Type: {request.headers.get('Content-Type')}")
+            app.logger.info(f"   Content-Length: {request.headers.get('Content-Length')}")
+            try:
+                body_preview = request.get_data(as_text=True)[:500]
+                app.logger.info(f"   Body preview: {body_preview}")
+            except Exception as e:
+                app.logger.info(f"   Body: (could not read: {e})")
     
     # Initialize Socket.IO with Redis support based on configuration
     use_redis = app.config.get('SOCKETIO_USE_REDIS', False)
