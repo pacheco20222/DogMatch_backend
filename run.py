@@ -4,6 +4,7 @@ For production, use wsgi.py instead
 """
 
 # Monkey patch for gevent compatibility
+# Take note of the wsgi.py file, it is the entry point for the production server
 from gevent import monkey
 monkey.patch_all()
 
