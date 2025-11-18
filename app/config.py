@@ -51,6 +51,10 @@ class Config:
     
     # Socket.IO Configuration
     SOCKETIO_USE_REDIS = False  # Override in ProductionConfig
+    SOCKETIO_CORS_ALLOWED_ORIGINS = "*"  # Allow all origins for Socket.IO
+    
+    # CORS Configuration for HTTP requests
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")  # Allow all origins by default
     
 class DevelopmentConfig(Config):
     DEBUG = True

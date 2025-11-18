@@ -6,6 +6,7 @@ from flask_marshmallow import Marshmallow
 from flask_socketio import SocketIO
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 from datetime import datetime
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -121,6 +122,16 @@ def create_app(config_name=None):
     
     # Setup database query performance monitoring
     setup_query_monitoring(app)
+    
+    # Initialize CORS for HTTP requests
+    # Allow all origins for now - can be restricted in production if needed
+    cors_origins = app.config.get('CORS_ORIGINS', '*')
+    CORS(app, 
+         origins=cors_origins,
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'])
+    app.logger.info(f"CORS enabled with origins: {cors_origins}")
     
     # Register request/response logging middleware
     from app.middleware import log_request, log_response
