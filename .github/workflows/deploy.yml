@@ -67,34 +67,103 @@ jobs:
             JWT_ACCESS_TOKEN_EXPIRES="${{ secrets.JWT_ACCESS_TOKEN_EXPIRES }}" \
             JWT_REFRESH_TOKEN_EXPIRES="${{ secrets.JWT_REFRESH_TOKEN_EXPIRES }}"
         
-        # Configure probes - using individual --set commands for reliability
-        az containerapp update \
-          --name $CONTAINER_APP_NAME \
-          --resource-group $AZURE_RESOURCE_GROUP \
-          --set properties.template.containers[0].probes[0].type=Startup \
-          --set properties.template.containers[0].probes[0].httpGet.path=/api/health/live \
-          --set properties.template.containers[0].probes[0].httpGet.port=5002 \
-          --set properties.template.containers[0].probes[0].httpGet.scheme=HTTP \
-          --set properties.template.containers[0].probes[0].initialDelaySeconds=10 \
-          --set properties.template.containers[0].probes[0].periodSeconds=5 \
-          --set properties.template.containers[0].probes[0].timeoutSeconds=3 \
-          --set properties.template.containers[0].probes[0].failureThreshold=30 \
-          --set properties.template.containers[0].probes[0].successThreshold=1 \
-          --set properties.template.containers[0].probes[1].type=Liveness \
-          --set properties.template.containers[0].probes[1].httpGet.path=/api/health/live \
-          --set properties.template.containers[0].probes[1].httpGet.port=5002 \
-          --set properties.template.containers[0].probes[1].httpGet.scheme=HTTP \
-          --set properties.template.containers[0].probes[1].initialDelaySeconds=30 \
-          --set properties.template.containers[0].probes[1].periodSeconds=10 \
-          --set properties.template.containers[0].probes[1].timeoutSeconds=5 \
-          --set properties.template.containers[0].probes[1].failureThreshold=3 \
-          --set properties.template.containers[0].probes[1].successThreshold=1 \
-          --set properties.template.containers[0].probes[2].type=Readiness \
-          --set properties.template.containers[0].probes[2].httpGet.path=/api/health/ready \
-          --set properties.template.containers[0].probes[2].httpGet.port=5002 \
-          --set properties.template.containers[0].probes[2].httpGet.scheme=HTTP \
-          --set properties.template.containers[0].probes[2].initialDelaySeconds=10 \
-          --set properties.template.containers[0].probes[2].periodSeconds=5 \
-          --set properties.template.containers[0].probes[2].timeoutSeconds=3 \
-          --set properties.template.containers[0].probes[2].failureThreshold=3 \
-          --set properties.template.containers[0].probes[2].successThreshold=1 
+        # Get current container app configuration and update probes using Python
+        python3 << EOF
+        import json
+        import subprocess
+        import sys
+        import os
+        
+        container_app_name = os.environ['CONTAINER_APP_NAME']
+        resource_group = os.environ['AZURE_RESOURCE_GROUP']
+        
+        # Get current container app config
+        result = subprocess.run(
+            ['az', 'containerapp', 'show', 
+             '--name', container_app_name,
+             '--resource-group', resource_group,
+             '--output', 'json'],
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print(f"Error getting container app: {result.stderr}", file=sys.stderr)
+            sys.exit(1)
+        
+        config = json.loads(result.stdout)
+        
+        # Define probes
+        probes = [
+            {
+                "type": "Startup",
+                "httpGet": {
+                    "path": "/api/health/live",
+                    "port": 5002,
+                    "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 10,
+                "periodSeconds": 5,
+                "timeoutSeconds": 3,
+                "failureThreshold": 30,
+                "successThreshold": 1
+            },
+            {
+                "type": "Liveness",
+                "httpGet": {
+                    "path": "/api/health/live",
+                    "port": 5002,
+                    "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 30,
+                "periodSeconds": 10,
+                "timeoutSeconds": 5,
+                "failureThreshold": 3,
+                "successThreshold": 1
+            },
+            {
+                "type": "Readiness",
+                "httpGet": {
+                    "path": "/api/health/ready",
+                    "port": 5002,
+                    "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 10,
+                "periodSeconds": 5,
+                "timeoutSeconds": 3,
+                "failureThreshold": 3,
+                "successThreshold": 1
+            }
+        ]
+        
+        # Update probes in the existing container config
+        # Get the existing container to preserve all settings
+        existing_container = config['properties']['template']['containers'][0].copy()
+        existing_container['probes'] = probes
+        
+        # For PATCH, send the template with updated probes
+        # This preserves all other container settings (env vars, resources, etc.)
+        update_payload = {
+            'properties': {
+                'template': {
+                    'containers': [existing_container]
+                }
+            }
+        }
+        
+        # Save update payload as JSON
+        with open('/tmp/containerapp-updated.json', 'w') as f:
+            json.dump(update_payload, f)
+        
+        print("Configuration updated successfully")
+        EOF
+        
+        # Apply the updated configuration using az rest (PATCH operation)
+        # Get the subscription ID
+        SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+        
+        # Use az rest to update the container app with the PATCH payload
+        az rest --method PATCH \
+          --uri "https://management.azure.com/subscriptions/${SUBSCRIPTION_ID}/resourceGroups/${AZURE_RESOURCE_GROUP}/providers/Microsoft.App/containerApps/${CONTAINER_APP_NAME}?api-version=2023-05-01" \
+          --headers "Content-Type=application/json" \
+          --body @/tmp/containerapp-updated.json 
