@@ -16,7 +16,7 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # ======================================================
-# WAIT FOR MYSQL
+# WAIT FOR MYSQL  (WITH SSL ENABLED)
 # ======================================================
 wait_for_database() {
     if [ -z "$DATABASE_URL" ]; then
@@ -26,7 +26,7 @@ wait_for_database() {
 
     log_info "Waiting for MySQL database to be ready..."
 
-    python3 - <<EOF
+python3 - <<EOF
 import sys
 import time
 import pymysql
@@ -42,9 +42,13 @@ db = url.path.lstrip("/")
 for attempt in range(15):
     try:
         conn = pymysql.connect(
-            host=host, port=port,
-            user=user, password=password,
-            database=db, connect_timeout=4
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            database=db,
+            connect_timeout=4,
+            ssl={}   # <<<<< IMPORTANT FIX — ENABLE TLS
         )
         conn.close()
         print("[SUCCESS] Database is ready!")
@@ -69,7 +73,7 @@ wait_for_redis() {
 
     log_info "Waiting for Redis to be ready..."
 
-    python3 - <<EOF
+python3 - <<EOF
 import sys
 import time
 import redis
