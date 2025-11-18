@@ -135,12 +135,12 @@ services:
       # FLASK_ENV, FLASK_DEBUG already in .env
       
       # Database connection - OVERRIDE to use local MySQL container
-      # Format: mysql+pymysql://user:password@host:port/database
-      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/${DB_NAME}
-      
-      # Individual DB vars - OVERRIDE host to use Docker network
+      # Use individual components instead of DATABASE_URL to avoid URL parsing issues
       DB_HOST: mysql
-      # DB_PORT, DB_USER, DB_PASSWORD, DB_NAME come from .env
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
       
       # Redis connection - OVERRIDE to use local Redis container (no password)
       REDIS_URL: redis://redis:6379/0
@@ -148,7 +148,6 @@ services:
       CACHE_TYPE: redis
       
       # JWT secrets, AWS credentials, etc. all come from .env
-      
       
       # Performance tuning for development
       GUNICORN_WORKERS: 2
