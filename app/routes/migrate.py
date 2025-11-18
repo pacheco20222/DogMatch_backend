@@ -5,6 +5,7 @@ from app import db
 
 migrate_bp = Blueprint("migrate", __name__)
 
+# Define routes for database migration management
 @migrate_bp.route('/init', methods=['POST'])
 def init_database():
     """
