@@ -2,8 +2,11 @@
 Health check endpoints for monitoring and orchestration
 """
 from flask import Blueprint, jsonify, current_app
-from app.utils.logger import logger
 import time
+import logging
+
+# Get the logger that's already configured in your app
+logger = logging.getLogger(__name__)
 
 health_bp = Blueprint('health', __name__)
 
