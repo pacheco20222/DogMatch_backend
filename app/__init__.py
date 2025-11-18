@@ -169,13 +169,23 @@ def create_app(config_name=None):
         safe_redis_url = ':'.join(safe_redis_url) + ':***@' + redis_url.split('@')[1] if '@' in redis_url else 'redis://***'
         
         app.logger.info(f"Initializing Socket.IO with Redis: {safe_redis_url}")
-        socketio.init_app(app,
-                         message_queue=redis_url,
-                         async_mode=async_mode,
-                         cors_allowed_origins=cors_allowed,
-                         logger=True,
-                         engineio_logger=True)
-        app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
+        try:
+            socketio.init_app(app,
+                             message_queue=redis_url,
+                             async_mode=async_mode,
+                             cors_allowed_origins=cors_allowed,
+                             logger=True,
+                             engineio_logger=True)
+            app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
+        except Exception as e:
+            app.logger.error(f"Failed to initialize Socket.IO with Redis: {str(e)}")
+            app.logger.warning("Falling back to Socket.IO without Redis (single server mode)")
+            socketio.init_app(app, 
+                             async_mode=async_mode,
+                             cors_allowed_origins=cors_allowed,
+                             logger=True,
+                             engineio_logger=True)
+            app.logger.info("Socket.IO initialized without Redis (fallback mode)")
     else:
         # Development mode without Redis
         app.logger.info("Initializing Socket.IO without Redis (development mode)")

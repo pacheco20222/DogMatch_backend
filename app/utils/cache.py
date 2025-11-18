@@ -31,11 +31,44 @@ def init_cache(app):
     
     # Redis-specific configuration
     if config['CACHE_TYPE'] == 'redis':
-        config['CACHE_REDIS_URL'] = app.config.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = app.config.get('REDIS_URL', 'redis://localhost:6379/0')
+        config['CACHE_REDIS_URL'] = redis_url
         config['CACHE_KEY_PREFIX'] = app.config.get('CACHE_KEY_PREFIX', 'dogmatch:')
+        
+        # Azure Redis connection options for better reliability
+        # These help with connection timeouts and retries
+        config['CACHE_REDIS_SOCKET_CONNECT_TIMEOUT'] = 5
+        config['CACHE_REDIS_SOCKET_TIMEOUT'] = 5
+        config['CACHE_REDIS_RETRY_ON_TIMEOUT'] = True
+        config['CACHE_REDIS_HEALTH_CHECK_INTERVAL'] = 30
+        config['CACHE_REDIS_SOCKET_KEEPALIVE'] = True
+        config['CACHE_REDIS_SOCKET_KEEPALIVE_OPTIONS'] = {
+            1: 1,  # TCP_KEEPIDLE
+            2: 3,  # TCP_KEEPINTVL
+            3: 5   # TCP_KEEPCNT
+        }
     
-    cache = Cache(app, config=config)
-    return cache
+    # Initialize cache with error handling
+    try:
+        cache = Cache(app, config=config)
+        # Test Redis connection if using Redis
+        if config['CACHE_TYPE'] == 'redis':
+            try:
+                cache.cache._write_client.ping()
+                app.logger.info("✅ Redis cache connection successful")
+            except Exception as e:
+                app.logger.error(f"❌ Redis cache connection failed: {str(e)}")
+                app.logger.warning("Falling back to SimpleCache (in-memory)")
+                # Fallback to SimpleCache
+                config['CACHE_TYPE'] = 'SimpleCache'
+                cache = Cache(app, config=config)
+        return cache
+    except Exception as e:
+        app.logger.error(f"Cache initialization failed: {str(e)}")
+        app.logger.warning("Falling back to SimpleCache (in-memory)")
+        config['CACHE_TYPE'] = 'SimpleCache'
+        cache = Cache(app, config=config)
+        return cache
 
 
 # ==================== Cache Key Generators ====================
