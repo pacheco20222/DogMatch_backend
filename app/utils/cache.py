@@ -47,24 +47,56 @@ def init_cache(app):
             password = parsed.password
             username = parsed.username or 'default'
             db = int(parsed.path.lstrip('/')) if parsed.path else 0
+            is_ssl = parsed.scheme == 'rediss'
             
-            # Create Redis connection following Redis Labs official example
-            # Note: Redis Labs handles SSL automatically, don't set ssl=True explicitly
-            redis_connection = redis.Redis(
-                host=host,
-                port=port,
-                username=username,
-                password=password,
-                db=db,
-                decode_responses=False,  # Keep as False for compatibility
-                socket_connect_timeout=5,
-                socket_timeout=5,
-                retry_on_timeout=True,
-                health_check_interval=30
-            )
+            # Create Redis connection with proper SSL configuration for Redis Labs
+            if is_ssl:
+                # For Redis Labs with SSL, try using from_url first
+                try:
+                    redis_connection = redis.from_url(
+                        redis_url,
+                        decode_responses=False,
+                        socket_connect_timeout=10,
+                        socket_timeout=10,
+                        retry_on_timeout=True,
+                        health_check_interval=30,
+                        ssl_cert_reqs=None,  # Disable certificate verification
+                        ssl_check_hostname=False
+                    )
+                except Exception:
+                    # Fallback to manual configuration
+                    redis_connection = redis.Redis(
+                        host=host,
+                        port=port,
+                        username=username,
+                        password=password,
+                        db=db,
+                        decode_responses=False,  # Keep as False for compatibility
+                        socket_connect_timeout=10,
+                        socket_timeout=10,
+                        retry_on_timeout=True,
+                        health_check_interval=30,
+                        ssl=True,
+                        ssl_cert_reqs=None,  # Use None instead of ssl.CERT_NONE
+                        ssl_ca_certs=None,
+                        ssl_check_hostname=False
+                    )
+            else:
+                redis_connection = redis.Redis(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    db=db,
+                    decode_responses=False,  # Keep as False for compatibility
+                    socket_connect_timeout=10,
+                    socket_timeout=10,
+                    retry_on_timeout=True,
+                    health_check_interval=30
+                )
             # Test the connection
             redis_connection.ping()
-            app.logger.info(f"✅ Redis cache connection successful to {host}:{port}")
+            app.logger.info(f"✅ Redis cache connection successful to {host}:{port} (SSL: {is_ssl})")
             
             # Pass the Redis connection object to Flask-Caching
             config['CACHE_REDIS'] = redis_connection
