@@ -51,36 +51,24 @@ def init_cache(app):
             
             # Create Redis connection with proper SSL configuration for Redis Labs
             if is_ssl:
-                # For Redis Labs with SSL, try using from_url first
-                try:
-                    redis_connection = redis.from_url(
-                        redis_url,
-                        decode_responses=False,
-                        socket_connect_timeout=10,
-                        socket_timeout=10,
-                        retry_on_timeout=True,
-                        health_check_interval=30,
-                        ssl_cert_reqs=None,  # Disable certificate verification
-                        ssl_check_hostname=False
-                    )
-                except Exception:
-                    # Fallback to manual configuration
-                    redis_connection = redis.Redis(
-                        host=host,
-                        port=port,
-                        username=username,
-                        password=password,
-                        db=db,
-                        decode_responses=False,  # Keep as False for compatibility
-                        socket_connect_timeout=10,
-                        socket_timeout=10,
-                        retry_on_timeout=True,
-                        health_check_interval=30,
-                        ssl=True,
-                        ssl_cert_reqs=None,  # Use None instead of ssl.CERT_NONE
-                        ssl_ca_certs=None,
-                        ssl_check_hostname=False
-                    )
+                # For Redis Labs with SSL, use manual configuration with proper SSL settings
+                import ssl
+                redis_connection = redis.Redis(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    db=db,
+                    decode_responses=False,  # Keep as False for compatibility
+                    socket_connect_timeout=10,
+                    socket_timeout=10,
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                    ssl=True,
+                    ssl_cert_reqs=ssl.CERT_NONE,  # Redis Labs uses self-signed certs
+                    ssl_ca_certs=None,
+                    ssl_check_hostname=False
+                )
             else:
                 redis_connection = redis.Redis(
                     host=host,
@@ -103,7 +91,11 @@ def init_cache(app):
         except Exception as e:
             app.logger.error(f"❌ Redis cache connection failed: {str(e)}")
             app.logger.error(f"   Host: {parsed.hostname}, Port: {parsed.port}")
-            raise
+            app.logger.warning("Falling back to SimpleCache (in-memory) due to Redis connection failure")
+            # Don't raise - fall back to SimpleCache instead
+            config['CACHE_TYPE'] = 'SimpleCache'
+            if 'CACHE_REDIS' in config:
+                del config['CACHE_REDIS']
     
     # Initialize cache with error handling
     try:

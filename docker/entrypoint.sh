@@ -112,34 +112,21 @@ for attempt in range(10):
         
         # Create Redis connection with proper SSL configuration for Redis Labs
         if is_ssl:
-            # Try using from_url first as it handles SSL automatically
-            try:
-                r = redis.from_url(
-                    redis_url,
-                    decode_responses=False,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True,
-                    ssl_cert_reqs=None,  # Disable certificate verification
-                    ssl_check_hostname=False
-                )
-            except Exception:
-                # Fallback to manual configuration
-                r = redis.Redis(
-                    host=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    db=db,
-                    decode_responses=False,
-                    socket_connect_timeout=5,
-                    socket_timeout=5,
-                    retry_on_timeout=True,
-                    ssl=True,
-                    ssl_cert_reqs=None,  # Use None instead of ssl.CERT_NONE
-                    ssl_ca_certs=None,
-                    ssl_check_hostname=False
-                )
+            r = redis.Redis(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                db=db,
+                decode_responses=False,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+                ssl=True,
+                ssl_cert_reqs=ssl.CERT_NONE,  # Redis Labs uses self-signed certs
+                ssl_ca_certs=None,
+                ssl_check_hostname=False
+            )
         else:
             r = redis.Redis(
                 host=host,
