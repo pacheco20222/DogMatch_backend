@@ -69,49 +69,21 @@ services:
     # Health check to know when MySQL is ready
     healthcheck:
       # Try to login and run a simple query
-      # Note: Using root user with password from .env
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${DB_PASSWORD}"]
+      # Using a shell command to properly handle password with special characters
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
       interval: 10s      # Check every 10 seconds
       timeout: 5s        # Fail if command takes > 5 seconds
-      retries: 5         # Try 5 times before marking unhealthy
-      start_period: 30s  # Wait 30 seconds before first check (MySQL startup time)
+      retries: 10        # Try 10 times before marking unhealthy (MySQL can take time to start)
+      start_period: 60s  # Wait 60 seconds before first check (MySQL initialization can take time)
     
     # Connect to custom network
     networks:
       - dogmatch-network
 
   # --------------------------------------------------------------------------
-  # Redis (Caching + Socket.IO Message Queue)
+  # Redis is NOT in Docker - using online Redis from .env REDIS_URL
+  # This allows testing with the same Redis instance as production
   # --------------------------------------------------------------------------
-  redis:
-    # Use official Redis 7 Alpine (small, 40MB)
-    image: redis:7-alpine
-    
-    container_name: dogmatch_redis
-    restart: unless-stopped
-    
-    # Command to run Redis WITHOUT password for local development
-    # (Your production Render Redis has a password in REDIS_URL from .env)
-    command: redis-server
-    
-    # Persistent storage for Redis data
-    volumes:
-      - redis_data:/data
-    
-    # Expose Redis port
-    ports:
-      - "6379:6379"
-    
-    # Health check for Redis
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    
-    networks:
-      - dogmatch-network
 
   # --------------------------------------------------------------------------
   # Backend (Flask Application)
@@ -131,21 +103,29 @@ services:
     
     # Override specific vars for local Docker environment
     environment:
-      # Flask configuration (keep from .env)
-      # FLASK_ENV, FLASK_DEBUG already in .env
+      # Flask configuration for local development
+      FLASK_ENV: development  # Use DevelopmentConfig (but override cache/redis below)
+      FLASK_DEBUG: "true"     # Enable debug mode for local dev
       
       # Database connection - OVERRIDE to use local MySQL container
       # Use individual components instead of DATABASE_URL to avoid URL parsing issues
-      DB_HOST: mysql
+      # The Config class will construct DATABASE_URL from these if DATABASE_URL is not set
+      DB_HOST: mysql          # Container name (Docker DNS resolves this)
       DB_PORT: 3306
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      # IMPORTANT: Override DATABASE_URL to use container name 'mysql' instead of 'localhost'
+      # The entrypoint script uses DATABASE_URL, so we must override it here
+      # Construct DATABASE_URL from .env variables, but use 'mysql' as host (container name)
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/${DB_NAME}
       
-      # Redis connection - OVERRIDE to use local Redis container (no password)
-      REDIS_URL: redis://redis:6379/0
-      SOCKETIO_USE_REDIS: "true"
-      CACHE_TYPE: redis
+      # Redis connection - USE ONLINE REDIS from .env file
+      # Using the same Redis instance as production (from REDIS_URL in .env)
+      # This allows testing with production-like Redis configuration (SSL, etc.)
+      # REDIS_URL is loaded from .env file (not overridden here)
+      SOCKETIO_USE_REDIS: "true"       # Use Redis for Socket.IO (from .env REDIS_URL)
+      CACHE_TYPE: redis                # Use Redis cache (from .env REDIS_URL)
       
       # JWT secrets, AWS credentials, etc. all come from .env
       
@@ -172,12 +152,11 @@ services:
     ports:
       - "5002:5002"
     
-    # Wait for these services to be healthy before starting
+    # Wait for MySQL to be healthy before starting
+    # Note: Redis is external (from .env), so no dependency needed
     depends_on:
       mysql:
         condition: service_healthy  # Wait for MySQL healthcheck to pass
-      redis:
-        condition: service_healthy  # Wait for Redis healthcheck to pass
     
     # Add health check for backend service
     healthcheck:
@@ -238,11 +217,8 @@ networks:
 # Named volumes for data that should survive container restarts
 volumes:
   # MySQL database files - ESSENTIAL (contains all user/dog/match data)
+  # Backup available in: dogmatch_backup_complete.sql
   mysql_data:
-    driver: local
-  
-  # Redis data files - caching and Socket.IO message queue
-  redis_data:
     driver: local
   
   # Application logs - debugging and monitoring
@@ -251,3 +227,4 @@ volumes:
   
   # Note: No volume for photos - all photos are stored in AWS S3!
   # Database only contains S3 URLs, not actual image files
+  # Note: Redis is external (online) - no local volume needed

@@ -454,6 +454,11 @@ def add_dog_photo(dog_id):
         else:
             return jsonify({'error': 'No photo provided. Send file as "photo" or JSON with "url"'}), 400
         
+        # Check if this is the first photo for this dog - make it primary automatically
+        existing_photos_count = Photo.query.filter_by(dog_id=dog_id).count()
+        if existing_photos_count == 0:
+            is_primary = True
+        
         # Create photo record
         photo = Photo(
             dog_id=dog_id,

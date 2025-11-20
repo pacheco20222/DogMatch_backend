@@ -32,41 +32,60 @@ def init_cache(app):
     # Redis-specific configuration
     if config['CACHE_TYPE'] == 'redis':
         redis_url = app.config.get('REDIS_URL', 'redis://localhost:6379/0')
-        config['CACHE_REDIS_URL'] = redis_url
         config['CACHE_KEY_PREFIX'] = app.config.get('CACHE_KEY_PREFIX', 'dogmatch:')
         
-        # Azure Redis connection options for better reliability
-        # These help with connection timeouts and retries
-        config['CACHE_REDIS_SOCKET_CONNECT_TIMEOUT'] = 5
-        config['CACHE_REDIS_SOCKET_TIMEOUT'] = 5
-        config['CACHE_REDIS_RETRY_ON_TIMEOUT'] = True
-        config['CACHE_REDIS_HEALTH_CHECK_INTERVAL'] = 30
-        config['CACHE_REDIS_SOCKET_KEEPALIVE'] = True
-        config['CACHE_REDIS_SOCKET_KEEPALIVE_OPTIONS'] = {
-            1: 1,  # TCP_KEEPIDLE
-            2: 3,  # TCP_KEEPINTVL
-            3: 5   # TCP_KEEPCNT
-        }
+        # Create a custom Redis connection following Redis Labs official example
+        from urllib.parse import urlparse
+        import redis
+        
+        parsed = urlparse(redis_url)
+        # Flask-Caching needs a Redis connection object, not just a URL
+        try:
+            # Extract connection details from URL
+            host = parsed.hostname
+            port = parsed.port or 6379
+            password = parsed.password
+            username = parsed.username or 'default'
+            db = int(parsed.path.lstrip('/')) if parsed.path else 0
+            
+            # Create Redis connection following Redis Labs official example
+            # Note: Redis Labs handles SSL automatically, don't set ssl=True explicitly
+            redis_connection = redis.Redis(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                db=db,
+                decode_responses=False,  # Keep as False for compatibility
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+                health_check_interval=30
+            )
+            # Test the connection
+            redis_connection.ping()
+            app.logger.info(f"✅ Redis cache connection successful to {host}:{port}")
+            
+            # Pass the Redis connection object to Flask-Caching
+            config['CACHE_REDIS'] = redis_connection
+        except Exception as e:
+            app.logger.error(f"❌ Redis cache connection failed: {str(e)}")
+            app.logger.error(f"   Host: {parsed.hostname}, Port: {parsed.port}")
+            raise
     
     # Initialize cache with error handling
     try:
         cache = Cache(app, config=config)
-        # Test Redis connection if using Redis
-        if config['CACHE_TYPE'] == 'redis':
-            try:
-                cache.cache._write_client.ping()
-                app.logger.info("✅ Redis cache connection successful")
-            except Exception as e:
-                app.logger.error(f"❌ Redis cache connection failed: {str(e)}")
-                app.logger.warning("Falling back to SimpleCache (in-memory)")
-                # Fallback to SimpleCache
-                config['CACHE_TYPE'] = 'SimpleCache'
-                cache = Cache(app, config=config)
+        # Connection was already tested when creating the Redis connection object
         return cache
     except Exception as e:
         app.logger.error(f"Cache initialization failed: {str(e)}")
         app.logger.warning("Falling back to SimpleCache (in-memory)")
+        # Fallback to SimpleCache
         config['CACHE_TYPE'] = 'SimpleCache'
+        # Remove Redis-specific config
+        if 'CACHE_REDIS' in config:
+            del config['CACHE_REDIS']
         cache = Cache(app, config=config)
         return cache
 

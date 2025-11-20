@@ -199,23 +199,51 @@ class Dog(db.Model):
         }
         
         if include_owner:
+            # Get owner's profile photo URL (signed URL if S3 key)
+            owner_profile_photo_url = None
+            if self.owner.profile_photo_url:
+                # Check if it's an S3 key (starts with user-photos/) or already a URL
+                if self.owner.profile_photo_url.startswith('user-photos/'):
+                    # It's an S3 key - generate signed URL
+                    try:
+                        from app.services.s3_service import s3_service
+                        from flask import current_app
+                        owner_profile_photo_url = s3_service.get_photo_url(
+                            self.owner.profile_photo_url, 
+                            signed=True, 
+                            expiration=604800  # 7 days
+                        )
+                        if not owner_profile_photo_url:
+                            current_app.logger.warning(f"Failed to generate signed URL for owner {self.owner.id} profile photo: {self.owner.profile_photo_url}")
+                    except Exception as e:
+                        from flask import current_app
+                        current_app.logger.error(f"Error generating signed URL for owner {self.owner.id} profile photo: {str(e)}")
+                else:
+                    # It's already a URL (legacy data or external URL)
+                    owner_profile_photo_url = self.owner.profile_photo_url
+            else:
+                from flask import current_app
+                current_app.logger.warning(f"⚠️ Owner {self.owner.id} ({self.owner.username}) has no profile_photo_url set in database")
+            
             data['owner'] = {
                 'id': self.owner.id,
                 'username': self.owner.username,
+                'first_name': self.owner.first_name,
+                'last_name': self.owner.last_name,
                 'full_name': self.owner.get_full_name(),
                 'user_type': self.owner.user_type,
                 'city': self.owner.city,
-                'state': self.owner.state
+                'state': self.owner.state,
+                'profile_photo_url': owner_profile_photo_url  # This will be None if no photo is set
             }
+            
+            # Debug logging - always log, even if None
+            from flask import current_app
+            current_app.logger.info(f"📸 Dog {self.id} owner {self.owner.id} ({self.owner.username}) profile_photo_url: {owner_profile_photo_url or 'NULL/None'}")
         
         if include_photos:
-            data['photos'] = [
-                {
-                    'id': photo.id,
-                    'url': photo.url,
-                    'is_primary': photo.is_primary
-                } for photo in self.photos
-            ]
+            # Use photo.to_dict() to get signed URLs
+            data['photos'] = [photo.to_dict() for photo in self.photos]
             data['primary_photo_url'] = self.get_primary_photo_url()
         
         if include_stats:
@@ -279,7 +307,9 @@ class Photo(db.Model):
     
     def is_s3_photo(self):
         """Check if this photo is stored in S3"""
-        return self.url.startswith('https://') and 's3' in self.url
+        # Check if it's an S3 key (starts with dog-photos/) or a full S3 URL
+        return (self.url.startswith('dog-photos/') or 
+                (self.url.startswith('https://') and 's3' in self.url))
     
     def get_s3_key(self):
         """Get S3 key for this photo (if stored in S3)"""
@@ -288,9 +318,11 @@ class Photo(db.Model):
     def to_dict(self):
         # Generate signed URL for S3 photos
         photo_url = self.url
-        if self.is_s3_photo() and self.s3_key:
+        if self.is_s3_photo():
             from app.services.s3_service import s3_service
-            signed_url = s3_service.get_photo_url(self.s3_key)
+            # Use s3_key if available, otherwise use url (which should be the S3 key)
+            s3_key = self.s3_key or self.url
+            signed_url = s3_service.get_photo_url(s3_key, signed=True, expiration=3600)
             if signed_url:
                 photo_url = signed_url
         

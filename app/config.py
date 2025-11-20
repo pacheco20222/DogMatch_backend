@@ -61,11 +61,13 @@ class DevelopmentConfig(Config):
     TESTING = False
     SQLALCHEMY_ECHO = True # Send queries to cli
     
-    # Development Cache - use SimpleCache (in-memory, no Redis needed)
-    CACHE_TYPE = "SimpleCache"
+    # Development Cache - check environment variable first, fallback to SimpleCache
+    # This allows docker-compose.yml to override with Redis if needed
+    CACHE_TYPE = os.environ.get("CACHE_TYPE", "SimpleCache")
     
-    # Development Socket.IO - no Redis needed (single server)
-    SOCKETIO_USE_REDIS = False
+    # Development Socket.IO - check environment variable first
+    # This allows docker-compose.yml to override with Redis if needed
+    SOCKETIO_USE_REDIS = os.environ.get("SOCKETIO_USE_REDIS", "false").lower() == "true"
     
 
 class ProductionConfig(Config):

@@ -170,16 +170,76 @@ def create_app(config_name=None):
         
         app.logger.info(f"Initializing Socket.IO with Redis: {safe_redis_url}")
         try:
+            # For Redis Labs with SSL, we need to configure SSL properly
+            # Socket.IO's message_queue needs a Redis connection object for SSL connections
+            import redis
+            from urllib.parse import urlparse
+            import ssl
+            
+            # Extract connection details from URL
+            parsed = urlparse(redis_url)
+            host = parsed.hostname
+            port = parsed.port or 6379
+            password = parsed.password
+            username = parsed.username or 'default'
+            is_ssl = parsed.scheme == 'rediss'
+            
+            # Create Redis connection with proper SSL configuration
+            if is_ssl:
+                # For Redis Labs with SSL, create connection with SSL settings
+                redis_connection = redis.Redis(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    decode_responses=False,  # Socket.IO needs bytes
+                    socket_connect_timeout=10,
+                    socket_timeout=10,
+                    retry_on_timeout=True,
+                    health_check_interval=30,
+                    ssl=True,
+                    ssl_cert_reqs=ssl.CERT_NONE,  # Redis Labs uses self-signed certs
+                    ssl_ca_certs=None,
+                    ssl_check_hostname=False
+                )
+            else:
+                # Non-SSL Redis connection
+                redis_connection = redis.Redis(
+                    host=host,
+                    port=port,
+                    username=username,
+                    password=password,
+                    decode_responses=False,
+                    socket_connect_timeout=10,
+                    socket_timeout=10,
+                    retry_on_timeout=True,
+                    health_check_interval=30
+                )
+            
+            # Test the connection
+            try:
+                redis_connection.ping()
+                app.logger.info(f"✅ Redis connection test successful to {host}:{port} (SSL: {is_ssl})")
+            except Exception as redis_error:
+                app.logger.error(f"Redis connection test failed: {str(redis_error)}")
+                redis_connection.close()
+                raise
+            
+            # For Socket.IO with SSL, we need to pass the Redis connection object
+            # Socket.IO's message_queue can accept a Redis connection object
             socketio.init_app(app,
-                             message_queue=redis_url,
+                             message_queue=redis_connection,
                              async_mode=async_mode,
                              cors_allowed_origins=cors_allowed,
                              logger=True,
                              engineio_logger=True)
+            
             app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
         except Exception as e:
             app.logger.error(f"Failed to initialize Socket.IO with Redis: {str(e)}")
             app.logger.warning("Falling back to Socket.IO without Redis (single server mode)")
+            # Disable Redis for Socket.IO on failure
+            app.config['SOCKETIO_USE_REDIS'] = False
             socketio.init_app(app, 
                              async_mode=async_mode,
                              cors_allowed_origins=cors_allowed,

@@ -39,21 +39,30 @@ user = url.username
 password = url.password
 db = url.path.lstrip("/")
 
+# Determine if we should use SSL
+# Local Docker MySQL (hostname 'mysql') doesn't need SSL
+use_ssl = host not in ['mysql', 'localhost', '127.0.0.1']
+
 for attempt in range(15):
     try:
-        conn = pymysql.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database=db,
-            connect_timeout=4,
-            ssl={
+        connect_args = {
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'database': db,
+            'connect_timeout': 4
+        }
+        
+        # Only use SSL for remote databases (AWS RDS, etc.)
+        if use_ssl:
+            connect_args['ssl'] = {
                 "ca": "/etc/ssl/certs/ca-certificates.crt",
-                "check_hostname" : False,
+                "check_hostname": False,
                 "verify_mode": 0
-            }   # <<<<< IMPORTANT FIX — ENABLE TLS
-        )
+            }
+        
+        conn = pymysql.connect(**connect_args)
         conn.close()
         print("[SUCCESS] Database is ready!")
         sys.exit(0)
@@ -75,18 +84,64 @@ wait_for_redis() {
         return 0
     fi
 
-    log_info "Waiting for Redis to be ready..."
+    # For local development, Redis connection failures are non-fatal
+    # The app will handle Redis connection gracefully
+    log_info "Checking Redis connection (non-blocking for local dev)..."
 
 python3 - <<EOF
 import sys
 import time
 import redis
+import ssl
+from urllib.parse import urlparse
+
+redis_url = "${REDIS_URL}"
+
+# Parse URL to extract connection details
+parsed = urlparse(redis_url)
+is_ssl = parsed.scheme == 'rediss'
 
 for attempt in range(10):
     try:
-        r = redis.from_url("${REDIS_URL}", socket_connect_timeout=3)
+        # Extract connection details from URL
+        host = parsed.hostname
+        port = parsed.port or 6379
+        password = parsed.password
+        username = parsed.username or 'default'
+        db = int(parsed.path.lstrip('/')) if parsed.path else 0
+        
+        # Create Redis connection with proper SSL configuration for Redis Labs
+        if is_ssl:
+            r = redis.Redis(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                db=db,
+                decode_responses=False,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True,
+                ssl=True,
+                ssl_cert_reqs=ssl.CERT_NONE,  # Redis Labs uses self-signed certs
+                ssl_ca_certs=None,
+                ssl_check_hostname=False
+            )
+        else:
+            r = redis.Redis(
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                db=db,
+                decode_responses=False,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+                retry_on_timeout=True
+            )
+        
         r.ping()
-        print("[SUCCESS] Redis is ready!")
+        print(f"[SUCCESS] Redis is ready! (SSL: {is_ssl})")
         sys.exit(0)
     except Exception as e:
         print(f"[WARNING] Redis not ready ({attempt+1}/10): {e}")

@@ -416,7 +416,11 @@ def get_conversations():
                 'count': 0
             }), 200
         
-        # Get all matched matches for the user
+        # OPTIMIZED: Use a single query with joins to avoid N+1 queries
+        from sqlalchemy import func, case
+        
+        # Get all matched matches for the user that have messages (using EXISTS subquery)
+        # MySQL doesn't support NULLS LAST, so we use a CASE statement to put NULLs at the end
         user_matches = Match.query.filter(
             db.or_(
                 Match.dog_one_id.in_(user_dog_ids),
@@ -425,38 +429,80 @@ def get_conversations():
             Match.status == 'matched',
             Match.is_active == True,
             Match.is_archived == False
+        ).filter(
+            # Only include matches that have at least one non-deleted message
+            db.exists().where(
+                db.and_(
+                    Message.match_id == Match.id,
+                    Message.is_deleted == False
+                )
+            )
+        ).order_by(
+            # MySQL-compatible: Put non-null values first (DESC), then nulls
+            case((Match.last_message_at.is_(None), 1), else_=0),
+            Match.last_message_at.desc()
         ).all()
         
-        # Filter to only include matches that have messages
-        matches_with_messages = []
-        for match in user_matches:
-            # Check if this match has any messages
-            has_messages = Message.query.filter(
-                Message.match_id == match.id,
+        # Get all match IDs for batch queries
+        match_ids = [match.id for match in user_matches]
+        
+        if not match_ids:
+            return jsonify({
+                'success': True,
+                'conversations': [],
+                'count': 0
+            }), 200
+        
+        # OPTIMIZED: Get last messages for all matches using a single efficient query
+        # Use a subquery to find max sent_at per match, then join to get the actual messages
+        from sqlalchemy import desc
+        
+        # Subquery: Get max sent_at for each match
+        max_timestamps_subq = db.session.query(
+            Message.match_id,
+            func.max(Message.sent_at).label('max_sent_at')
+        ).filter(
+            Message.match_id.in_(match_ids),
+            Message.is_deleted == False
+        ).group_by(Message.match_id).subquery()
+        
+        # Get the actual last messages by joining with the subquery
+        # For each match, get the message with the max sent_at (and highest ID if there are ties)
+        last_messages_raw = db.session.query(Message).join(
+            max_timestamps_subq,
+            db.and_(
+                Message.match_id == max_timestamps_subq.c.match_id,
+                Message.sent_at == max_timestamps_subq.c.max_sent_at,
                 Message.is_deleted == False
-            ).first() is not None
-            
-            if has_messages:
-                matches_with_messages.append(match)
+            )
+        ).order_by(Message.match_id, Message.id.desc()).all()
         
-        # Sort by last message time
-        matches_with_messages.sort(key=lambda m: m.last_message_at or datetime(1970, 1, 1), reverse=True)
+        # Build dictionary, keeping only the first (most recent) message per match
+        last_messages = {}
+        seen_match_ids = set()
+        for msg in last_messages_raw:
+            if msg.match_id not in seen_match_ids:
+                last_messages[msg.match_id] = msg
+                seen_match_ids.add(msg.match_id)
         
+        # OPTIMIZED: Get unread counts for all matches in a single query
+        unread_counts_query = db.session.query(
+            Message.match_id,
+            func.count(Message.id).label('unread_count')
+        ).filter(
+            Message.match_id.in_(match_ids),
+            Message.sender_user_id != current_user_id,
+            Message.is_read == False,
+            Message.is_deleted == False
+        ).group_by(Message.match_id).all()
+        
+        unread_counts = {row[0]: row[1] for row in unread_counts_query}
+        
+        # Build conversations list
         conversations = []
-        for match in matches_with_messages:
-            # Get last message
-            last_message = Message.query.filter(
-                Message.match_id == match.id,
-                Message.is_deleted == False
-            ).order_by(Message.sent_at.desc()).first()
-            
-            # Get unread count
-            unread_count = Message.query.filter(
-                Message.match_id == match.id,
-                Message.sender_user_id != current_user_id,
-                Message.is_read == False,
-                Message.is_deleted == False
-            ).count()
+        for match in user_matches:
+            last_message = last_messages.get(match.id)
+            unread_count = unread_counts.get(match.id, 0)
             
             conversation_data = {
                 'match': match.to_dict(current_user_id=current_user_id, include_dogs=True),
