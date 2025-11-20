@@ -227,14 +227,14 @@ def create_app(config_name=None):
             
             # For Socket.IO with SSL, we need to pass the Redis connection object
             # Socket.IO's message_queue can accept a Redis connection object
-        socketio.init_app(app,
+            socketio.init_app(app,
                              message_queue=redis_connection,
                          async_mode=async_mode,
                          cors_allowed_origins=cors_allowed,
                          logger=True,
                          engineio_logger=True)
             
-        app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
+            app.logger.info("Socket.IO initialized with Redis (supports horizontal scaling)")
         except Exception as e:
             app.logger.error(f"Failed to initialize Socket.IO with Redis: {str(e)}")
             app.logger.warning("Falling back to Socket.IO without Redis (single server mode)")
