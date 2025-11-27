@@ -81,8 +81,7 @@ services:
       - dogmatch-network
 
   # --------------------------------------------------------------------------
-  # Redis is NOT in Docker - using online Redis from .env REDIS_URL
-  # This allows testing with the same Redis instance as production
+  # Using SimpleCache (in-memory) for local caching
   # --------------------------------------------------------------------------
 
   # --------------------------------------------------------------------------
@@ -104,7 +103,7 @@ services:
     # Override specific vars for local Docker environment
     environment:
       # Flask configuration for local development
-      FLASK_ENV: development  # Use DevelopmentConfig (but override cache/redis below)
+      FLASK_ENV: development  # Use DevelopmentConfig
       FLASK_DEBUG: "true"     # Enable debug mode for local dev
       
       # Database connection - OVERRIDE to use local MySQL container
@@ -119,13 +118,6 @@ services:
       # The entrypoint script uses DATABASE_URL, so we must override it here
       # Construct DATABASE_URL from .env variables, but use 'mysql' as host (container name)
       DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/${DB_NAME}
-      
-      # Redis connection - USE ONLINE REDIS from .env file
-      # Using the same Redis instance as production (from REDIS_URL in .env)
-      # This allows testing with production-like Redis configuration (SSL, etc.)
-      # REDIS_URL is loaded from .env file (not overridden here)
-      SOCKETIO_USE_REDIS: "true"       # Use Redis for Socket.IO (from .env REDIS_URL)
-      CACHE_TYPE: redis                # Use Redis cache (from .env REDIS_URL)
       
       # JWT secrets, AWS credentials, etc. all come from .env
       
@@ -153,7 +145,6 @@ services:
       - "5002:5002"
     
     # Wait for MySQL to be healthy before starting
-    # Note: Redis is external (from .env), so no dependency needed
     depends_on:
       mysql:
         condition: service_healthy  # Wait for MySQL healthcheck to pass
@@ -227,4 +218,3 @@ volumes:
   
   # Note: No volume for photos - all photos are stored in AWS S3!
   # Database only contains S3 URLs, not actual image files
-  # Note: Redis is external (online) - no local volume needed

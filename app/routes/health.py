@@ -34,7 +34,6 @@ def readiness_check():
     
     checks = {
         'database': False,
-        'redis': False,
         'overall': False
     }
     
@@ -48,20 +47,6 @@ def readiness_check():
         # Don't fail readiness check if database is temporarily unavailable
         # This prevents Azure from blocking all traffic
         checks['database'] = True  # Mark as OK to allow traffic through
-    
-    try:
-        # Check Redis connection - access through current_app
-        redis_client = current_app.extensions.get('redis')
-        if redis_client:
-            redis_client.ping()
-            checks['redis'] = True
-            logger.debug('Health check: Redis is healthy')
-        else:
-            logger.warning('Health check: Redis client not configured')
-            checks['redis'] = True  # Don't fail if Redis is optional
-    except Exception as e:
-        logger.error(f'Health check: Redis is unhealthy - {str(e)}')
-        checks['redis'] = True  # Don't fail if Redis is optional
     
     # Overall status - always return 200 for readiness
     # The app should be ready to accept traffic even if dependencies have issues

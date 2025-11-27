@@ -8,15 +8,21 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY")
     
-    # Database Configuration, to connect to the database
-    # For AWS RDS, we need to handle SSL properly
+    # Database Configuration - use DATABASE_URL directly from environment
+    # Azure Web App for Containers provides DATABASE_URL directly
     db_url = os.environ.get("DATABASE_URL")
     if db_url and '?' in db_url:
         # Remove SSL parameters from DATABASE_URL if present
         db_url = db_url.split('?')[0]
     
-    SQLALCHEMY_DATABASE_URI = db_url or \
-        f"mysql+pymysql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT', '3306')}/{os.environ.get('DB_NAME')}"
+    # Use DATABASE_URL directly (required for Azure deployment)
+    # Fallback to individual components only for local development
+    if db_url:
+        SQLALCHEMY_DATABASE_URI = db_url
+    else:
+        # Fallback for local development (not used in Azure)
+        SQLALCHEMY_DATABASE_URI = \
+            f"mysql+pymysql://{os.environ.get('DB_USER')}:{os.environ.get('DB_PASSWORD')}@{os.environ.get('DB_HOST')}:{os.environ.get('DB_PORT', '3306')}/{os.environ.get('DB_NAME')}"
     
     # SQLAlchemy engine options for SSL
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -42,15 +48,12 @@ class Config:
     UPLOAD_FOLDER = os.path.join('app', 'static', 'dog_photos')
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     
-    # Cache Configuration
-    CACHE_TYPE = os.environ.get("CACHE_TYPE", "SimpleCache")  # SimpleCache, redis, or FileSystemCache
+    # Cache Configuration (SimpleCache only - in-memory)
+    CACHE_TYPE = "SimpleCache"
     CACHE_DEFAULT_TIMEOUT = int(os.environ.get("CACHE_DEFAULT_TIMEOUT", 300))  # 5 minutes default
     CACHE_KEY_PREFIX = "dogmatch:"
-    # Redis configuration (used if CACHE_TYPE='redis')
-    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
     
-    # Socket.IO Configuration
-    SOCKETIO_USE_REDIS = False  # Override in ProductionConfig
+    # Socket.IO Configuration (single server mode - no Redis)
     SOCKETIO_CORS_ALLOWED_ORIGINS = "*"  # Allow all origins for Socket.IO
     
     # CORS Configuration for HTTP requests
@@ -61,14 +64,6 @@ class DevelopmentConfig(Config):
     TESTING = False
     SQLALCHEMY_ECHO = True # Send queries to cli
     
-    # Development Cache - check environment variable first, fallback to SimpleCache
-    # This allows docker-compose.yml to override with Redis if needed
-    CACHE_TYPE = os.environ.get("CACHE_TYPE", "SimpleCache")
-    
-    # Development Socket.IO - check environment variable first
-    # This allows docker-compose.yml to override with Redis if needed
-    SOCKETIO_USE_REDIS = os.environ.get("SOCKETIO_USE_REDIS", "false").lower() == "true"
-    
 
 class ProductionConfig(Config):
     DEBUG = False
@@ -77,12 +72,8 @@ class ProductionConfig(Config):
     
     PREFERRED_URL_SCHEME = "https"
     
-    # Production Cache - use Redis for distributed caching
-    CACHE_TYPE = "redis"
+    # Production Cache - use SimpleCache (in-memory)
     CACHE_DEFAULT_TIMEOUT = 600  # 10 minutes in production
-    
-    # Production Socket.IO - use Redis for horizontal scaling
-    SOCKETIO_USE_REDIS = True
     
 class TestingConfig(Config):
     """Testing environment configuration"""

@@ -2,7 +2,7 @@
 Cache Utility
 
 Provides centralized caching functions and cache key generators.
-Uses Flask-Caching with Redis backend for distributed caching.
+Uses Flask-Caching with SimpleCache (in-memory) for local caching.
 """
 
 from functools import wraps
@@ -17,7 +17,7 @@ cache = None
 
 def init_cache(app):
     """
-    Initialize cache with app configuration
+    Initialize cache with app configuration (SimpleCache only)
     
     Args:
         app: Flask application instance
@@ -25,93 +25,19 @@ def init_cache(app):
     global cache
     
     config = {
-        'CACHE_TYPE': app.config.get('CACHE_TYPE', 'SimpleCache'),
+        'CACHE_TYPE': 'SimpleCache',  # Always use SimpleCache (in-memory)
         'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 300),
+        'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'dogmatch:'),
     }
     
-    # Redis-specific configuration
-    if config['CACHE_TYPE'] == 'redis':
-        redis_url = app.config.get('REDIS_URL', 'redis://localhost:6379/0')
-        config['CACHE_KEY_PREFIX'] = app.config.get('CACHE_KEY_PREFIX', 'dogmatch:')
-        
-        # Create a custom Redis connection following Redis Labs official example
-        from urllib.parse import urlparse
-        import redis
-        
-        parsed = urlparse(redis_url)
-        # Flask-Caching needs a Redis connection object, not just a URL
-        try:
-            # Extract connection details from URL
-            host = parsed.hostname
-            port = parsed.port or 6379
-            password = parsed.password
-            username = parsed.username or 'default'
-            db = int(parsed.path.lstrip('/')) if parsed.path else 0
-            is_ssl = parsed.scheme == 'rediss'
-            
-            # Create Redis connection with proper SSL configuration for Redis Labs
-            if is_ssl:
-                # For Redis Labs with SSL, use manual configuration with proper SSL settings
-                import ssl
-                redis_connection = redis.Redis(
-                    host=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    db=db,
-                    decode_responses=False,  # Keep as False for compatibility
-                    socket_connect_timeout=10,
-                    socket_timeout=10,
-                    retry_on_timeout=True,
-                    health_check_interval=30,
-                    ssl=True,
-                    ssl_cert_reqs=ssl.CERT_NONE,  # Redis Labs uses self-signed certs
-                    ssl_ca_certs=None,
-                    ssl_check_hostname=False
-                )
-            else:
-                redis_connection = redis.Redis(
-                    host=host,
-                    port=port,
-                    username=username,
-                    password=password,
-                    db=db,
-                    decode_responses=False,  # Keep as False for compatibility
-                    socket_connect_timeout=10,
-                    socket_timeout=10,
-                    retry_on_timeout=True,
-                    health_check_interval=30
-                )
-            # Test the connection
-            redis_connection.ping()
-            app.logger.info(f"✅ Redis cache connection successful to {host}:{port} (SSL: {is_ssl})")
-            
-            # Pass the Redis connection object to Flask-Caching
-            config['CACHE_REDIS'] = redis_connection
-        except Exception as e:
-            app.logger.error(f"❌ Redis cache connection failed: {str(e)}")
-            app.logger.error(f"   Host: {parsed.hostname}, Port: {parsed.port}")
-            app.logger.warning("Falling back to SimpleCache (in-memory) due to Redis connection failure")
-            # Don't raise - fall back to SimpleCache instead
-            config['CACHE_TYPE'] = 'SimpleCache'
-            if 'CACHE_REDIS' in config:
-                del config['CACHE_REDIS']
-    
-    # Initialize cache with error handling
+    # Initialize cache
     try:
         cache = Cache(app, config=config)
-        # Connection was already tested when creating the Redis connection object
+        app.logger.info("✅ Cache initialized with SimpleCache (in-memory)")
         return cache
     except Exception as e:
         app.logger.error(f"Cache initialization failed: {str(e)}")
-        app.logger.warning("Falling back to SimpleCache (in-memory)")
-        # Fallback to SimpleCache
-        config['CACHE_TYPE'] = 'SimpleCache'
-        # Remove Redis-specific config
-        if 'CACHE_REDIS' in config:
-            del config['CACHE_REDIS']
-        cache = Cache(app, config=config)
-        return cache
+        raise
 
 
 # ==================== Cache Key Generators ====================
@@ -238,8 +164,8 @@ def invalidate_message_cache(match_id):
 
 def invalidate_available_dogs_cache():
     """Invalidate available dogs cache (called when dogs change)"""
-    # Delete pattern would be better, but not available in SimpleCache
-    # For Redis, you could use cache.delete_many() with pattern matching
+    # SimpleCache doesn't support pattern matching
+    # Cache will expire naturally based on timeout
     pass
 
 
@@ -338,30 +264,9 @@ def get_cache_stats():
         dict: Cache statistics
     """
     stats = {
-        'type': cache.config.get('CACHE_TYPE', 'unknown'),
+        'type': cache.config.get('CACHE_TYPE', 'SimpleCache'),
         'default_timeout': cache.config.get('CACHE_DEFAULT_TIMEOUT', 0),
     }
-    
-    # Redis-specific stats
-    if stats['type'] == 'redis':
-        try:
-            redis_client = cache.cache._write_client
-            info = redis_client.info('stats')
-            stats['redis'] = {
-                'total_connections': info.get('total_connections_received', 0),
-                'total_commands': info.get('total_commands_processed', 0),
-                'keyspace_hits': info.get('keyspace_hits', 0),
-                'keyspace_misses': info.get('keyspace_misses', 0),
-                'used_memory_human': redis_client.info('memory').get('used_memory_human', 'unknown'),
-            }
-            
-            # Calculate hit rate
-            hits = stats['redis']['keyspace_hits']
-            misses = stats['redis']['keyspace_misses']
-            total = hits + misses
-            stats['redis']['hit_rate'] = f"{(hits / total * 100):.2f}%" if total > 0 else "0%"
-        except Exception as e:
-            stats['redis_error'] = str(e)
     
     return stats
 
