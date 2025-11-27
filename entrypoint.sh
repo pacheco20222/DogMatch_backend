@@ -97,20 +97,11 @@ set -e
 
 log_success "Dependencies OK!"
 
-# Start Nginx in the background (runs as root to bind to port 80)
-log_info "Starting Nginx..."
-# Test nginx configuration first
-nginx -t
-# Start nginx in background (master process runs as root)
-nginx
-log_success "Nginx started"
-
-# Wait a moment for Nginx to start
-sleep 2
+# Skip Nginx (not supported in Azure Web App for Containers)
+log_info "Skipping Nginx (not supported in Azure Web App for Containers)"
 
 # Start Gunicorn in the foreground (this will be the main process)
-log_info "Starting Gunicorn..."
+log_info "Starting Gunicorn on port ${PORT:-8000}..."
 # Note: Running as root for Azure compatibility (Azure containers run as root by default)
-# Gunicorn workers can drop privileges if needed via gunicorn.conf.py
+# Gunicorn will bind to the PORT environment variable injected by Azure
 exec gunicorn --config gunicorn.conf.py wsgi:app
-

@@ -6,8 +6,8 @@ Production-ready settings for Azure Web App for Containers
 import os
 import multiprocessing
 
-# Server socket
-bind = "0.0.0.0:8000"
+# Server socket - Use PORT environment variable from Azure (defaults to 8000)
+bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
 backlog = 2048
 
 # Worker processes
@@ -55,7 +55,8 @@ statsd_prefix = "gunicorn"
 
 def when_ready(server):
     """Called just after the server is started."""
-    server.log.info("Gunicorn server is ready. Spawning workers.")
+    port = os.getenv('PORT', '8000')
+    server.log.info(f"Gunicorn server is ready on port {port}. Spawning workers.")
 
 def worker_int(worker):
     """Called just after a worker has been killed."""
@@ -76,4 +77,3 @@ def post_worker_init(worker):
 def worker_abort(worker):
     """Called when a worker times out."""
     worker.log.warning("Worker timeout (pid: %s)", worker.pid)
-

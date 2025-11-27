@@ -29,25 +29,23 @@ RUN python -m venv /app/venv && \
     /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ============================================================================
-# Stage 2: Runtime - Final image with app, nginx, and gunicorn
+# Stage 2: Runtime - Final image with app and gunicorn only
 # ============================================================================
 FROM python:3.11-slim
 
 LABEL maintainer="jrp2022@gmail.com"
-LABEL description="DogMatch Backend - Production Runtime"
+LABEL description="DogMatch Backend - Production Runtime (Azure Web App for Containers)"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/venv/bin:$PATH" \
     PORT=8000
 
-# Install runtime dependencies (nginx, mysql client, curl)
+# Install runtime dependencies (mysql client, curl for health checks)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx \
     default-libmysqlclient-dev \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /etc/nginx/sites-enabled/default
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN groupadd -r appuser && \
@@ -66,7 +64,6 @@ COPY requirements.txt /app/
 
 # Copy configuration files
 COPY gunicorn.conf.py /app/
-COPY nginx.conf /app/
 COPY entrypoint.sh /app/
 
 # Set permissions for entrypoint
@@ -77,21 +74,12 @@ RUN chmod +x /app/entrypoint.sh && \
 RUN mkdir -p /app/logs && \
     chown -R appuser:appuser /app
 
-# Copy nginx config to system location
-RUN cp /app/nginx.conf /etc/nginx/nginx.conf && \
-    mkdir -p /var/log/nginx /var/lib/nginx /var/cache/nginx && \
-    chown -R appuser:appuser /var/log/nginx /var/lib/nginx /var/cache/nginx
+# Expose port (Azure will inject PORT environment variable)
+EXPOSE 8000
 
-# Note: Container runs as root by default in Azure
-# Nginx master process needs root to bind to port 80
-# Gunicorn will run as appuser via entrypoint
-
-# Expose port 8000 (Gunicorn) and 80 (Nginx)
-EXPOSE 8000 80
-
-# Health check
+# Health check (Azure will inject PORT, default to 8000)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:80/api/health/live || exit 1
+    CMD sh -c 'curl -f http://localhost:${PORT:-8000}/api/health/live || exit 1'
 
 # Use entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]
